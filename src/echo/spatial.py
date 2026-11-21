@@ -1,8 +1,22 @@
-"""Trajectories, room geometry and the binaural propagation model.
+"""spatial.py: where sounds are, and how they sound from there.
 
-Coordinates are metres, top-down. The listener's head is at the origin facing
-+y; +x is to the listener's right. Ears sit at (+-HEAD/2, 0).
+Coordinates are metres, seen from above. The listener's head is at the origin
+facing +y; +x is to the listener's right. Ears sit at (+-HEAD/2, 0).
+
+Contents:
+  Trajectories   Static, Orbit, Spiral, Oscillate, Flyby, Waypoints. Each is
+                 callable: time array -> (x, y) positions.
+  Room           rectangle around the listener. Wall echoes use the image-source
+                 method: one mirrored copy of the source per wall.
+  Propagation    per-sound realism settings (Doppler, distance fade, air
+                 absorption, head shadow).
+  propagate()    mono sound + moving position -> stereo. Each ear reads the sound
+                 through a fractional delay (distance / speed of sound). The
+                 difference between ears is the interaural time difference; the
+                 change over time is the Doppler shift. Then distance fade and
+                 a distance- and shadow-dependent low-pass are applied.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

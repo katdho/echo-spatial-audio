@@ -4,14 +4,13 @@
 Implements delay lines, filters, plucked-string synthesis, stereo effects,
 and reverberation
 
-The main optimization is to replace per-sample Python loops w/ block-based
-or vectorized operations wherever the recurrence allows it:
-* Feedback delay lines: Process blocks of M samples bc each output
-  depends only on samples at least M positions earlier
-* Fractional delay: Vectorize reads and linear interpolation bc there
-  is no feedback
-* One-pole filtering: Use a geometric-series formulation w/in short
-  chunks, carrying filter state between chunks
+Contents:
+  fractional_delay   time-varying, non-integer delay (gives ITD and Doppler)
+  feedback_delay, delay, allpass, one_pole   basic delay/filter blocks
+  pluck              Karplus-Strong plucked string (physical model)
+  ping_pong          stereo cross-feedback echo
+  schroeder_reverb, fdn_reverb   the two reverb algorithms
+  unit_energy        calibrates reverb level so "level" means the same at any decay time
 """
 
 from __future__ import annotations

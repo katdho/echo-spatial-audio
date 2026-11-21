@@ -1,5 +1,12 @@
-"""Built-in sound generators for ECHO, written as pyquist instruments so they
-work with pq.Score exactly like the instruments in the course notes."""
+"""sources.py: ECHO's built-in sounds.
+
+  pluck_instrument  one Karplus-Strong string note, written as a pyquist
+                    instrument so it works with pq.Score like the course notes' instruments
+  pluck_line        a list of (onset, pitch, duration) notes -> one mono Audio
+  noise_bursts      short decaying noise ticks: percussive, ideal for hearing motion
+The string model itself lives in dsp.pluck.
+"""
+
 from __future__ import annotations
 
 from typing import Sequence
