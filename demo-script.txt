@@ -1,0 +1,79 @@
+BEFORE RECORDING
+- Put on headphones and check that the recording captures both screen and audio.
+- Open a terminal in src/ and start the panel with: python app.py
+- Open spatial.py and dsp.py in the editor so they are ready to show.
+- Run python tests.py once before recording.
+- Render backup WAVs with python demo.py. If a live render fails, play the matching file from renders/.
+- Render each scene once beforehand so you know how long it takes.
+- Close unrelated tabs and notifications.
+
+0:00 — INTRODUCTION (about 20 seconds)
+ACTION: Start on the Step 1 screen.
+
+SAY:
+“This is ECHO, a spatial-audio instrument. You place sounds in a virtual room, move them around the listener, and it renders a stereo mix for headphones. It is built around delay lines and spatialization techniques from Chapters 12 and 13. Please listen on headphones.”
+
+0:20 — DEMO 1: DOPPLER FLYBY (about 60 seconds)
+ACTION: Click Doppler fly-by. Point to the line across the map.
+
+SAY:
+“A ticking sound flies past me at about 11 metres per second, three metres in front of me. A bass string sits still on my left as a reference. The room and reverb are off, so you can hear the basic spatial cues.”
+
+ACTION: Press Render and play. Let the scene play.
+
+SAY:
+“Hear it move from left to right: that is the interaural time difference, because each ear reads the sound at a slightly different delay. It gets louder as it approaches, then quieter as it moves away. The pitch also drops as it leaves: that is the Doppler shift.”
+
+ACTION: Set Pitch bend (Doppler) to 0 and render again.
+
+SAY:
+“With Doppler at zero, the panning and loudness remain, but the pitch bend disappears. This shows that Doppler is a separate spatial cue.”
+
+ACTION: Switch to the code editor. Open spatial.py and show propagate().
+
+SAY:
+“Each ear reads the source through a time-varying fractional delay, implemented by fractional_delay() in dsp.py. The delay is the distance to that ear divided by the speed of sound. The difference between the ear delays creates the time difference. As the delay changes, the read position moves faster or slower through the source, producing the Doppler shift.”
+
+1:20 — DEMO 2: ORBITING STRINGS (about 60 seconds)
+ACTION: Return to the browser. Click Start over twice, then choose Orbiting strings.
+
+SAY:
+“Now a plucked-string arpeggio circles my head in a 14-by-11-metre room, over a low drone.”
+
+ACTION: Press Render and play. While it plays, drag the drone to the right side of the map.
+
+SAY:
+“I can move a source directly on the map. The strings are generated with my own Karplus–Strong model: a burst of noise fed through a damped feedback delay line.”
+
+ACTION: Render again. Lower Wall softness, raise Decay time to about 6 seconds, turn Ping-pong echo off, and render again.
+
+SAY:
+“Harder walls produce brighter early reflections. A longer decay creates a more reverberant space. The ping-pong delay sends each repeat between the two stereo channels. Turning it off makes the scene drier.”
+
+ACTION: Open dsp.py and show feedback_delay() and fdn_reverb().
+
+SAY:
+“The reverb is a feedback delay network: eight delay lines mixed by a Hadamard matrix, with each line's gain set to produce the selected 60-decibel decay time. The course notes express feedback loops one sample at a time. Since each output sample only depends on samples at least M positions earlier, feedback_delay() processes M samples at a time using vector operations. This produces identical output, which tests.py checks against the sample-by-sample circular-buffer implementation.”
+
+2:20 — DEMO 3: DISTANT CATHEDRAL (about 30 seconds)
+ACTION: Return to the browser. Click Start over twice, choose Distant cathedral, then render and play.
+
+SAY:
+“This scene uses the same engine with different settings: a 40-by-30-metre room, a dark seven-second reverb with predelay, and bell-like sounds moving in a slow spiral. The long reverb and distance-dependent filtering make the sounds feel far away.”
+
+2:50 — COMPOSITION SKETCH (about 45 seconds)
+ACTION: Click Start over twice, then choose Composition sketch. Point to the five sources on the map.
+
+SAY:
+“This is the plan for my final composition. A distant drone enters first. An arpeggio circles in one direction, then a counter-melody enters and circles the other way. Ticks sweep from left to right, followed by a Doppler flyby at the climax. Everything then dissolves into the reverb tail.”
+
+ACTION: Press Render and play. Let it run.
+
+SAY:
+“In the final piece, I will use ECHO as the spatial mixing stage. My own recordings and the string instrument will go in as dry sources and come out as a moving, reverberant stereo scene.”
+
+3:35 — WRAP-UP (about 25 seconds)
+ACTION: Switch to the terminal and run python tests.py.
+
+SAY:
+“The tests check that the optimized delay lines match the course-note implementations, that the interaural delay matches the modeled head width, that a flyby produces the expected Doppler shift, and that the measured reverb decay matches its setting. All eleven tests pass. Thanks for listening.”
