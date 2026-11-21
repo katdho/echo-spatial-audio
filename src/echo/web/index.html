@@ -1,3 +1,15 @@
+<!-- index.html: ECHO's control panel (page, styling and behavior)
+
+  Step 1  Choose sounds: demo scenes, built-in sounds, upload your own files
+  Step 2  Shape the scene: map in the center (drag sounds), per-sound sliders on
+          the left, room/reverb/echo on the right
+  Step 3  Listen: Render and play, watch the dots follow the audio, Export WAV
+
+  All states lives in one object (S). The page never makes sound itself: it posts
+  S to the server (/api/render) and plays the WAV that comes back.
+  No external libraries or downloads. Served by echo/webui.py
+-->
+
 <!doctype html>
 <html lang="en">
 <head>

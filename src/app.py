@@ -1,16 +1,17 @@
-"""Start the ECHO control panel in your browser.
+"""app.py: starts ECHO's control panel.
 
-    python app.py                 # opens http://127.0.0.1:8765
-    python app.py --port 9000     # pick another port
-    python app.py --no-browser    # just print the address
+Run this file to use ECHO:  python src/app.py
+It starts a small local web server (echo/webui.py) and opens the control panel
+in your browser at http://127.0.0.1:8765. Stop it with Ctrl+C
 
-Stop it with Ctrl+C. Use headphones: the 3-D effect is binaural.
+Options:  --port 9000  (use another port)   --no-browser  (just print the address)
+Use headphones: the 3-D effect is binaural.
 """
 import argparse
 
 try:
-    from echo.webui import launch
-except ModuleNotFoundError as exc:                      # friendlier than a traceback
+    from Assignment9.src.echo.webui import launch
+except ModuleNotFoundError as exc:                      
     raise SystemExit(f"Missing package: {exc.name}. Install it with:  pip install pyquist")
 
 if __name__ == "__main__":

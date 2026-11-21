@@ -1,19 +1,24 @@
-"""Renders the demos shown in the video, plus a composition sketch.
-
+"""demo.py: render the example scenes shown in the demo video
     python demo.py                       # synthetic sources only (no files needed)
     python demo.py --files a.wav b.wav   # also use your own recordings as sources
     python demo.py --play                # play each render after writing it
 
-Outputs go to ./renders/*.wav  (stereo, 44.1 kHz; best on headphones).
+Writes four stereo WAV files (44.1 kHz) to ./renders/:
+  1_doppler_flyby      dry ticks fly past: time difference, Doppler, loudness
+  2_orbiting_strings   plucked arpeggio orbits in a room w/ reverb and ping-pong echo
+  3_distant_cathedral  bells spiral in a huge, dark, reverberant space
+  4_composition_sketch layered scene that previews the final composition
+These are the same scenes as the demo cards in the control panel. Best on headphones
 """
+
 import argparse
 import time
 from pathlib import Path
 
 import pyquist as pq
 
-from echo import (DelaySettings, Echo, Flyby, Orbit, Oscillate, Propagation,
-                  ReverbSettings, Room, Spiral, Static, Waypoints, sources)
+from Assignment9.src.echo import DelaySettings, Echo, Flyby, Orbit, Oscillate, Propagation, ReverbSettings, Room, Spiral, Static, Waypoints
+from echo import (sources)
 
 OUT = Path("renders")
 
@@ -32,7 +37,7 @@ def pentatonic_arp(seconds, step=0.25, base=("A3", "C4", "D4", "E4", "G4", "A4",
 
 
 def demo1_doppler_flyby(play):
-    """Example 1 - a dry ticking source flies past the listener: ITD, Doppler, level."""
+    """Demo 1- Doppler Flyby: dry ticking source flies past the listener: ITD, Doppler, level"""
     e = Echo()
     e.reverb.enabled = False
     e.room.enabled = False
@@ -46,7 +51,7 @@ def demo1_doppler_flyby(play):
 
 
 def demo2_orbiting_strings(play):
-    """Example 2 - plucked-string arpeggio orbiting in a live room with ping-pong echo."""
+    """Demo 2- Orbiting Strings: plucked-string arpeggio orbiting in a live room w/ ping-pong echo"""
     e = Echo()
     e.room = Room(width=14, depth=11, absorption=0.25)
     e.reverb = ReverbSettings(kind="fdn", t60=3.0, damping=0.25, level_db=-8.0)
@@ -59,7 +64,7 @@ def demo2_orbiting_strings(play):
 
 
 def demo3_distant_cathedral(play, files):
-    """Example 3 - big, dark, distant: a spiralling source in a huge reverberant room."""
+    """Demo 3- Distant Cathedral: big, dark, distant; spiralling source in a huge reverberant room"""
     e = Echo()
     e.room = Room(width=40, depth=30, absorption=0.1)
     e.reverb = ReverbSettings(kind="fdn", t60=7.0, damping=0.4, size=1.8, predelay=0.06, level_db=-3.0)
@@ -77,7 +82,7 @@ def demo3_distant_cathedral(play, files):
 
 def sketch(play, files):
     """Composition sketch (~30 s): layers enter one by one, move in opposite directions,
-    then everything dissolves into the reverb tail."""
+    then everything dissolves into reverb tail"""
     e = Echo()
     e.room = Room(width=16, depth=12, absorption=0.3)
     e.reverb = ReverbSettings(t60=4.0, damping=0.3, level_db=-6.0)

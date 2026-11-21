@@ -2,10 +2,9 @@
  
 ECHO is a spatial-audio instrument. You place sounds in a virtual room, move them around a listener, and it renders a stereo mix for headphones. You hear each sound's direction, distance, movement, and the space around it.
  
-Everything is built from delay lines (course chapters 12 and 13), in NumPy only, on top of pyquist for audio I/O.
+Everything is built from delay lines in NumPy on top of pyquist for audio I/O.
  
 ## What you can hear
- 
 | Effect | How it is made |
 | --- | --- |
 | Direction (left, right, front) | Each ear reads the sound at a slightly different delay |
@@ -16,36 +15,37 @@ Everything is built from delay lines (course chapters 12 and 13), in NumPy only,
 | Rhythm | A ping-pong echo that bounces between your ears |
 | Plucked strings | A Karplus-Strong physical model, as the built-in sound source |
  
-**Use headphones.** The 3-D effect is binaural and collapses on speakers.
+Recommended to **Use headphones:** The 3-D effect is binaural and collapses on speakers
  
 ## Quick start
- 
-From the `src/` folder:
- 
 ```sh
+git clone https://github.com/katdho/echo-spatial-audio.git
 pip install pyquist
-python tests.py      # should end with: all 11 tests passed
-python app.py        # opens the control panel in your browser
+python src/tests.py      # should end with: all 11 tests passed
+python src/app.py        # opens the control panel in your browser
 ```
  
-Then follow the three steps at the top of the page.
- 
-1. **Choose sounds.** Open a demo scene, or click sounds to add them, then press **Build scene**.
-2. **Shape the scene.** The map is in the middle: drag sounds to move them. Sliders for each sound are on the left. Room, reverb and echo are on the right. Hover any control to see what it does.
-3. **Listen.** Press **Render and play** (or Space). The dots move along their paths in time with the audio. **Export WAV** saves the result.
-Reset options: double-click a control's name to reset it, **Reset sliders** to restore everything but keep your sounds, **Start over** (click twice) to clear it all.
+Then follow the following steps at the top of the page
+1. **Choose sounds:** Open a demo scene, or click sounds to add them, then press **Build scene**
+2. **Shape the scene:** The map is in the middle: drag sounds to move them and hover on any control to see what it does
+    - Sliders for each sound are on the left
+    - Room, reverb and echo are on the right
+3. **Listen:** Press **Render and play** (or Space). The dots move along their paths in time w/ the audio
+    - **Export WAV** saves the result
+    - Reset options: double-click a control's name to reset it
+        - **Reset sliders** to restore everything but keep your sounds
+        - **Start over** to clear it all
  
 Other commands:
  
 ```sh
-python demo.py                     # renders the demo scenes to renders/*.wav
-python demo.py --files a.wav       # same, using your own recording
-python app.py --port 9000          # use another port if 8765 is busy
-jupyter lab echo_notebook.ipynb    # optional: the panel inside a notebook
+python src/demo.py                     # renders the demo scenes to renders/*.wav
+python src/demo.py --files a.wav       # same, using your own recording
+python src/app.py --port 9000          # use another port if 8765 is busy
+jupyter lab src/echo_notebook.ipynb    # optional: the panel inside a notebook
 ```
  
 ## Use it from code
- 
 ```python
 from echo import Echo, Orbit, ReverbSettings, sources
  
@@ -66,34 +66,31 @@ source audio ─→ spatial.propagate() ─→ dry stereo ─┬─→ ping-pong
 ## Files
  
 ```
-README.md          This file.
+README.md          This file: Overview of Everything
 DEMO_GUIDE.md      Step-by-step demo walkthrough, timed script for the video, troubleshooting.
 TECHNICAL.md       Project write-up: requirements, every parameter, citations, AI workflow.
 src/
   app.py           START HERE. Launches the control panel.
   demo.py          Renders the demo scenes to renders/.
   tests.py         11 checks of the DSP and the panel's backend.
-  echo_notebook.ipynb   Optional notebook that embeds the panel and shows code examples.
-  renders/         Pre-rendered WAVs from demo.py.
+  echo_notebook.ipynb   Optional notebook that embeds the panel and shows code examples
+  renders/         Pre-rendered WAVs from demo.py
   echo/
-    dsp.py         Delay-line building blocks: fractional delay, feedback delay, all-pass,
+    dsp.py         Delay-line building blocks: fractional delay, feedback delay, all-pass
                    one-pole filter, Karplus-Strong string, ping-pong, both reverbs.
     spatial.py     Sound paths (orbit, spiral, fly-by, ...), the room, and propagate()
-                   for time difference, Doppler, distance fade and dulling.
-    engine.py      The Echo class: combines sources, room, reverb and echo into a mix.
-    sources.py     Built-in sounds: plucked-string notes and noise ticks.
-    webui.py       Local web server that connects the control panel to the engine. No DSP.
-    web/index.html The control panel (page, styling and behaviour in one file).
-    ui.py          The earlier ipywidgets panel, kept for reference.
+                   for time difference, Doppler, distance fade and dulling
+    engine.py      The Echo class: combines sources, room, reverb and echo into a mix
+    sources.py     Built-in sounds: plucked-string notes and noise ticks
+    webui.py       Local web server that connects the control panel to the engine. No DSP
+    web/index.html The control panel (page, styling and behavior in one file)
 ```
  
 ## Requirements
- 
-Python 3.10 or newer and `pip install pyquist`. The control panel needs nothing else. `matplotlib` and `ipywidgets` are only for the optional notebook and the old panel.
+Python 3.10 or newer and `pip install pyquist`. The control panel needs nothing else. `matplotlib` and `ipywidgets` are only for the optional notebook
  
 ## Notes and limits
- 
-- The room is 2-D (top-down, four walls), and sources should be inside it. It is an artistic approximation, not an acoustic simulation.
-- Rendering takes a few seconds for typical scenes. Longer scenes and longer reverb decay take longer.
-- Freesound sounds need an internet connection. Uploaded files work best as WAV or FLAC.
+- The room is 2D (top-down, four walls), and sources should be inside it. It is an artistic approximation, not an acoustic simulation
+- Rendering takes a few seconds for typical scenes. Longer scenes and longer reverb decay take longer
+- Freesound sounds need an internet connection. Uploaded files work best as WAV or FLAC
  
