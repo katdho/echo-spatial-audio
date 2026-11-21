@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pyquist as pq
 
-from Assignment9.src.echo import DelaySettings, Echo, Flyby, Orbit, Oscillate, Propagation, ReverbSettings, Room, Spiral, Static, Waypoints
+from echo import DelaySettings, Echo, Flyby, Orbit, Oscillate, Propagation, ReverbSettings, Room, Spiral, Static, Waypoints
 from echo import (sources)
 
 OUT = Path("renders")

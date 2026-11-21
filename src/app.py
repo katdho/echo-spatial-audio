@@ -10,7 +10,7 @@ Use headphones: the 3-D effect is binaural.
 import argparse
 
 try:
-    from Assignment9.src.echo.webui import launch
+    from echo.webui import launch
 except ModuleNotFoundError as exc:                      
     raise SystemExit(f"Missing package: {exc.name}. Install it with:  pip install pyquist")
 
