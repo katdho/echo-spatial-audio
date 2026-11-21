@@ -1,28 +1,26 @@
 """sources.py: ECHO's built-in sounds.
 
-  pluck_instrument  one Karplus-Strong string note, written as a pyquist
-                    instrument so it works with pq.Score like the course notes' instruments
-  pluck_line        a list of (onset, pitch, duration) notes -> one mono Audio
-  noise_bursts      short decaying noise ticks: percussive, ideal for hearing motion
-The string model itself lives in dsp.pluck.
+Provides simple sound generators for testing and demonstrating spatial audio:
+- pluck_instrument: Generate one Karplus-Strong plucked-string note
+- pluck_line: Arrange multiple plucked notes into a mono audio phrase
+- noise_bursts: Generate short, decaying noise events for tracking motion
+
+The string synthesis algorithm is implemented in dsp.pluck
 """
 
 from __future__ import annotations
-
 from typing import Sequence
-
 import numpy as np
 import pyquist as pq
-
 from . import dsp
 
 F_S = 44100
 
-
 def pluck_instrument(pitch, duration: float, t60: float | None = None, damping: float = 0.5,
                      pick_position: float = 0.0, f_s: int = F_S, seed: int | None = None) -> pq.Audio:
-    """A Karplus-Strong string as a pyquist instrument. `pitch` is a name
-    ("E3") or a MIDI number."""
+    """Generate a Karplus-Strong string as a pyquist instrument; 
+    `pitch` is a name ("E3") or a MIDI number
+    """
     if isinstance(pitch, str):
         pitch = pq.helper.pitch_name_to_pitch(pitch)
     f0 = float(pq.helper.pitch_to_frequency(pitch))
@@ -33,8 +31,10 @@ def pluck_instrument(pitch, duration: float, t60: float | None = None, damping: 
 
 def pluck_line(notes: Sequence[tuple], t60: float = 2.0, damping: float = 0.5,
                pick_position: float = 0.0, f_s: int = F_S, seed: int = 0) -> pq.Audio:
-    """Render [(onset_seconds, pitch, duration_seconds), ...] with the plucked-string
-    model into one mono Audio, using pq.Score (as in the notes)."""
+    """Render sequence of plucked notes: [(onset_seconds, pitch, duration_seconds), ...] 
+    with the plucked-string model into one mono Audio, using pq.Score
+    """
+
     score = pq.Score([(t, {"pitch": p, "duration": d, "seed": seed + i})
                       for i, (t, p, d) in enumerate(notes)])
 
@@ -45,13 +45,18 @@ def pluck_line(notes: Sequence[tuple], t60: float = 2.0, damping: float = 0.5,
 
 
 def noise_bursts(times: Sequence[float], length: float = 0.12, f_s: int = F_S, seed: int = 0) -> pq.Audio:
-    """Short decaying noise ticks - a handy percussive source for hearing motion."""
+    """Generate short, decaying noise events at specified onset times
+
+    These percussive sounds are useful for making source movement and
+    spatial propagation easy to hear
+    """
+
     rng = np.random.default_rng(seed)
-    total = int((max(times) + length + 0.05) * f_s)
+    total = int((max(times)+length+0.05)*f_s)
     y = np.zeros(total)
-    n = int(length * f_s)
-    env = np.exp(-np.arange(n) / (0.15 * n))
+    n = int(length*f_s)
+    env = np.exp(-np.arange(n)/(0.15*n))
     for t in times:
-        i = int(t * f_s)
-        y[i:i + n] += rng.uniform(-1, 1, n) * env
+        i = int(t*f_s)
+        y[i:i + n] += rng.uniform(-1, 1, n)*env
     return pq.Audio(y.astype(np.float32), f_s)
