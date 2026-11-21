@@ -1,5 +1,5 @@
-"""ECHO - a spatial delay-line instrument built on pyquist."""
-from . import dsp, sources
+"""Initializes ECHO: a spatial delay-line instrument built on pyquist"""
+from ...echo_submission_v4.src.echo import dsp, sources
 from .engine import DelaySettings, Echo, ReverbSettings, Source
 from .spatial import (MOTIONS, Flyby, Oscillate, Orbit, Propagation, Room, Spiral,
                       Static, Waypoints)

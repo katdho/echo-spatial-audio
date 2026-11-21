@@ -1,4 +1,7 @@
-"""ECHO low-level DSP (NumPy only).
+"""ECHO low-level DSP (NumPy only)
+
+Implement Delay-Line Reccurences as a Per-Sample Python Loop, 
+evaluating each a block at a time
 
 Everything here is implemented from the delay-line recurrences in the course
 notes (pcm-12-physical, pcm-13-effects). The notes write each recurrence as a
