@@ -57,9 +57,42 @@ h1,h2,h3,p{margin:0}
 
 /* ---------- setup ---------- */
 .setup{flex:1;overflow:auto;display:flex;flex-direction:column}
-.setup-inner{width:min(1040px,100%);margin:0 auto;padding:40px 24px 120px;flex:1}
-.setup h1{font-size:34px;line-height:1.15;letter-spacing:-.02em;font-weight:750;max-width:20ch}
-.lede{color:var(--muted);margin-top:10px;max-width:56ch;font-size:15px}
+
+/* Full-width introduction and option sections */
+
+.setup-inner {
+  width: 100%;
+}
+
+.setup h1 {
+  max-width: none;
+}
+
+.lede {
+  max-width: none;
+}
+.setup-inner{
+  width:100%;
+  margin:0 auto;
+  padding:40px 24px 120px;
+  flex:1;
+}
+
+.setup h1{
+  font-size:34px;
+  line-height:1.15;
+  letter-spacing:-.02em;
+  font-weight:750;
+  max-width:none;
+}
+
+.lede{
+  color:var(--muted);
+  margin-top:10px;
+  max-width:none;
+  font-size:15px;
+}
+
 .setup section{margin-top:34px}
 .setup h2{font-size:16px;font-weight:650;margin-bottom:4px}
 .setup h2+p{color:var(--muted);margin-bottom:14px}
@@ -92,9 +125,6 @@ h1,h2,h3,p{margin:0}
 .rail.left{grid-column:1;grid-row:1;border-right:1px solid var(--line);--c:var(--gold)}
 .center{grid-column:2;grid-row:1}
 .rail.right{grid-column:3;grid-row:1;border-left:1px solid var(--line)}
-.rail-head{display:flex;justify-content:space-between;align-items:center}
-.rail-head h2{font-size:15px;font-weight:650}
-.rail-head .btn{padding:4px 10px;font-size:13px}
 .src-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
 .src-item{display:flex;align-items:center;gap:4px;border:1px solid transparent;border-radius:10px;background:var(--panel2)}
 .src-item.sel{border-color:var(--c);box-shadow:0 0 0 1px var(--c) inset}
@@ -184,24 +214,24 @@ dialog .cards{grid-template-columns:1fr 1fr}
 <!-- ============ STEP 1 ============ -->
 <main class="setup" id="setup">
   <div class="setup-inner">
-    <h1>Place sounds in a room, then hear them move.</h1>
-    <p class="lede">Pick what you want to hear, build the scene, and shape it on a map. Put headphones on. The 3-D effect only works in your ears, not on speakers.</p>
+    <h1>You place sounds in a virtual room, move them around the listener, and it renders a stereo mix</h1>
+    <p class="lede">It is built around delay lines and spatialization techniques. Pick what you want to hear, build the scene, and shape it on a map. Put headphones on. Note: The 3-D effect only works in your ears, not on speakers.</p>
 
     <section>
-      <h2>Start from a demo</h2>
-      <p>Opens a finished scene straight away. Change anything afterwards.</p>
+      <h2>Option 1: Start From An Example</h2>
+      <p>Opens a finished scene which you can then edit</p>
       <div class="cards" id="preset-grid"></div>
     </section>
 
     <section>
-      <h2>Or build your own</h2>
-      <p>Click a sound to add it. Click again to add another copy.</p>
+      <h2>Option 2: Build Your Own</h2>
+      <p>Click a sound to add it. Click again to add another copy</p>
       <div class="cards kinds" id="kind-grid"></div>
       <div class="extras">
-        <div class="extra"><span>Your own recording</span>
+        <div class="extra"><span>Upload a recording</span>
           <input type="file" id="file-input" accept="audio/*" hidden>
           <button class="btn" id="btn-file">Choose a file</button></div>
-        <div class="extra"><span>Freesound sound</span>
+        <div class="extra"><span>Enter a Freesound ID</span>
           <input type="text" id="fs-id" placeholder="Freesound ID" inputmode="numeric" aria-label="Freesound ID">
           <button class="btn" id="btn-fs">Add</button></div>
       </div>
@@ -248,6 +278,7 @@ dialog .cards{grid-template-columns:1fr 1fr}
 
 <script>
 "use strict";
+
 /* ------------------------------------------------------------------ constants */
 const COLORS = ["#5eead4","#ff8fab","#a78bfa","#7cc4ff","#fdba74","#d9f99d","#f0abfc","#fde68a"];
 const BASE = {motion:"Static",x:0,y:3,radius:4,speed:0.08,pass_time:6,start:0,gain:0,send:0.3,doppler:1,rolloff:1,air:1,shadow:1};
@@ -260,17 +291,17 @@ const HINT_DEFAULT = "Drag a sound on the map to move it. Hover any control to s
 
 /* ------------------------------------------------------------------ state */
 let catalog = {kinds:[], presets:[]};
-let S = freshState();           // everything the engine needs
-let G0 = snapshot(S);           // what "Reset sliders" returns to
-let sel = 0;                    // selected source index
-let view = 0;                   // 0 = choose sounds, 1 = studio
-let paths = {};                 // id -> {x:[],y:[]}
-let rendered = null;            // {url, duration}
-let previous = null;            // the render before it, for A/B listening
+let S = freshState();
+let G0 = snapshot(S);
+let sel = 0;
+let view = 0;
+let paths = {};
+let rendered = null;
+let previous = null;
 let showingPrev = false;
 let dirty = false;
 let rendering = false;
-let built = false;           // has the studio been opened yet?
+let built = false;
 
 function freshState(){ return {length:16, sources:[], room:{...ROOM0}, reverb:{...REVERB0}, delay:{...DELAY0}}; }
 function snapshot(s){ return JSON.parse(JSON.stringify(s)); }
@@ -350,7 +381,6 @@ function updateButtons(){
   b.disabled = rendering || !S.sources.length;
   b.textContent = rendering ? "Rendering…" : (rendered ? "Render again" : "Render and play");
   $("#btn-build").disabled = !S.sources.length;
-  // stepper
   const cur = view===0 ? 0 : (rendered ? 2 : 1);
   document.querySelectorAll("#steps button").forEach((btn,i)=>{
     if (i===cur) btn.setAttribute("aria-current","step"); else btn.removeAttribute("aria-current");
@@ -405,7 +435,6 @@ function group(title,children,onReset,enabled){
   return h("div",{class:"group"},head,children);
 }
 
-let rebuildAfter = false;
 function onChange(rebuild=false){
   if (rebuild) { renderLeft(); renderRight(); }
   markDirty(); fetchScene(); requestDraw();
@@ -432,21 +461,21 @@ function renderLeft(){
   const sp = s.motion==="Oscillate" ? "swings/min" : "laps/min";
   const radiusLabel = {Orbit:"Circle radius",Spiral:"Outer radius",Oscillate:"Sweep width (each side)",Flyby:"Pass distance (each side)"}[s.motion];
   const moveRows=[ select("Path",MOTIONS,()=>s.motion,v=>{s.motion=v;},"How this sound travels around you.") ];
-  moveRows.push(mk({key:"x",label:"Left to right",min:-15,max:15,step:0.1,fmt:v=>(v>0?"+":"")+v.toFixed(1)+" m",hint:"Position left (−) or right (+) of you, in metres. For moving sounds this is the centre of the path. You can also drag it on the map."}));
-  moveRows.push(mk({key:"y",label:"Behind to ahead",min:-15,max:15,step:0.1,fmt:v=>(v>0?"+":"")+v.toFixed(1)+" m",hint:"Position behind (−) or ahead (+) of you. You sit in the centre of the map facing up."}));
+  moveRows.push(mk({key:"x",label:"X-Position (Left/Right)",min:-15,max:15,step:0.1,fmt:v=>(v>0?"+":"")+v.toFixed(1)+" m",hint:"Position left (−) or right (+) of you, in meters. For moving sounds this is the center of the path. You can also drag it on the map."}));
+  moveRows.push(mk({key:"y",label:"Y-Position (Behind/Ahead)",min:-15,max:15,step:0.1,fmt:v=>(v>0?"+":"")+v.toFixed(1)+" m",hint:"Position behind (−) or ahead (+) of you. You sit in the center of the map facing up."}));
   if (s.motion!=="Static") moveRows.push(mk({key:"radius",label:radiusLabel,min:0.5,max:40,step:0.5,fmt:num(1," m"),hint:"How big the movement is."}));
   if (s.motion==="Orbit"||s.motion==="Spiral"||s.motion==="Oscillate")
     moveRows.push(mk({key:"speed",label:"Speed",min:-0.5,max:0.5,step:0.005,fmt:v=>Math.abs(v)<0.0025?"still":(v>0?"↺ ":"↻ ")+Math.abs(v*60).toFixed(1)+" "+sp,hint:"How fast it moves. The arrow shows the direction seen on the map. Negative reverses it."}));
   if (s.motion==="Flyby")
     moveRows.push(mk({key:"pass_time",label:"Fly-by time",min:1,max:30,step:0.5,fmt:num(1," s"),hint:"How long the pass takes. A shorter pass is faster, so the pitch bend is stronger."}));
-  moveRows.push(mk({key:"start",label:"Enters at",min:0,max:S.length,step:0.5,fmt:num(1," s"),hint:"When this sound starts, in seconds from the beginning."}));
+  moveRows.push(mk({key:"start",label:"Starts at",min:0,max:S.length,step:0.5,fmt:num(1," s"),hint:"When this sound starts, in seconds from the beginning."}));
   rail.append(group("Movement",moveRows,()=>{ PARAM_KEYS.slice(0,7).forEach(k=>s[k]=s.def[k]); }));
   rail.append(group("Level",[
     mk({key:"gain",label:"Volume",min:-30,max:6,step:0.5,fmt:db,hint:"How loud this sound is before it travels around."}),
-    mk({key:"send",label:"Reverb amount",idle:()=>S.reverb.enabled?null:"the reverb is switched off (right side).",min:0,max:1,step:0.01,fmt:pct,hint:"How much goes into the reverb. More makes it sound farther away and washier."}),
+    mk({key:"send",label:"Reverb amount",min:0,max:1,step:0.01,fmt:pct,hint:"How much goes into the reverb. More makes it sound farther away and washier.",idle:()=>S.reverb.enabled?null:"the reverb is switched off (right side)."}),
   ],()=>{ ["gain","send"].forEach(k=>s[k]=s.def[k]); }));
   rail.append(group("Realism",[
-    mk({key:"doppler",label:"Pitch bend (Doppler)",idle:()=>s.motion==="Static"?"this sound isn't moving, so there is no pitch bend.":null,min:0,max:3,step:0.05,fmt:v=>v===0?"off":v.toFixed(2)+"×",hint:"Pitch changes as a sound moves toward or away from you. 0 is off, 1 is like real life, higher is exaggerated."}),
+    mk({key:"doppler",label:"Pitch bend (Doppler)",min:0,max:3,step:0.05,fmt:v=>v===0?"off":v.toFixed(2)+"×",hint:"Pitch changes as a sound moves toward or away from you. 0 is off, 1 is like real life, higher is exaggerated.",idle:()=>s.motion==="Static"?"this sound isn't moving, so there is no pitch bend.":null}),
     mk({key:"rolloff",label:"Distance fade",min:0,max:2,step:0.05,fmt:num(2),hint:"How quickly it gets quieter with distance. 1 is realistic. 0 keeps the same volume everywhere."}),
     mk({key:"air",label:"Distance dulling",min:0,max:4,step:0.05,fmt:num(2),hint:"How much treble is lost over distance. Higher makes faraway sounds duller."}),
     mk({key:"shadow",label:"Head shadow",min:0,max:1,step:0.01,fmt:pct,hint:"How much your head muffles the ear facing away from the sound."}),
@@ -525,25 +554,21 @@ function draw(){
   const v = frozenView || computeView(w,hh);
   const maxR = Math.max(w,hh)/2/v.sc;
   const steps=[1,2,5,10,20,50]; const step=steps.find(s=>maxR/s<=7)||50;
-  // distance rings
   ctx.lineWidth=1; ctx.font="11px "+getComputedStyle(document.body).fontFamily; ctx.textBaseline="middle";
   for (let r=step;r<maxR*1.5;r+=step){
     ctx.strokeStyle="rgba(150,165,205,.13)"; ctx.beginPath(); ctx.arc(v.cx,v.cy,r*v.sc,0,Math.PI*2); ctx.stroke();
     ctx.fillStyle="rgba(150,165,205,.55)"; ctx.textAlign="left"; ctx.fillText(r+" m",v.cx+r*v.sc*0.7071+4,v.cy-r*v.sc*0.7071);
   }
   ctx.strokeStyle="rgba(150,165,205,.12)"; ctx.beginPath(); ctx.moveTo(0,v.cy); ctx.lineTo(w,v.cy); ctx.moveTo(v.cx,0); ctx.lineTo(v.cx,hh); ctx.stroke();
-  // room
   if (S.room.enabled){
     const [x0,y0]=toS(v,-S.room.width/2,S.room.depth/2), rw=S.room.width*v.sc, rh=S.room.depth*v.sc;
     ctx.fillStyle="rgba(255,207,107,.045)"; ctx.fillRect(x0,y0,rw,rh);
     ctx.strokeStyle="rgba(255,207,107,.55)"; ctx.lineWidth=2; ctx.strokeRect(x0,y0,rw,rh);
     ctx.fillStyle="rgba(255,207,107,.8)"; ctx.textAlign="left"; ctx.fillText(`room ${S.room.width.toFixed(0)} × ${S.room.depth.toFixed(0)} m`,x0+8,y0+14);
   }
-  // direction labels
   ctx.fillStyle="rgba(190,200,225,.6)"; ctx.font="600 12px "+getComputedStyle(document.body).fontFamily; ctx.textAlign="center";
   ctx.fillText("ahead",v.cx,14); ctx.fillText("behind",v.cx,hh-12);
   ctx.textAlign="left"; ctx.fillText("left",8,v.cy-12); ctx.textAlign="right"; ctx.fillText("right",w-8,v.cy-12);
-  // paths + sources
   const t=playT();
   S.sources.forEach((s,i)=>{
     const p=paths[s.id], col=colorOf(i), on=i===sel;
@@ -551,7 +576,7 @@ function draw(){
       ctx.strokeStyle=col; ctx.globalAlpha=on?0.9:0.38; ctx.lineWidth=on?2.5:1.5; ctx.setLineDash(on?[]:[5,5]);
       ctx.beginPath(); for (let k=0;k<p.x.length;k++){ const [sx,sy]=toS(v,p.x[k],p.y[k]); k?ctx.lineTo(sx,sy):ctx.moveTo(sx,sy); } ctx.stroke();
       ctx.setLineDash([]); ctx.globalAlpha=1;
-      const [ax,ay]=toS(v,s.x,s.y);           // draggable anchor (centre of the path)
+      const [ax,ay]=toS(v,s.x,s.y);
       ctx.strokeStyle=col; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(ax,ay,on?7:5,0,Math.PI*2); ctx.moveTo(ax-4,ay); ctx.lineTo(ax+4,ay); ctx.moveTo(ax,ay-4); ctx.lineTo(ax,ay+4); ctx.stroke();
     }
     const [px,py]=toS(v,...posAt(s,t)), live = !rendered || t>=s.start;
@@ -562,7 +587,6 @@ function draw(){
     ctx.fillStyle="#0c101c"; ctx.font="700 12px "+getComputedStyle(document.body).fontFamily; ctx.textAlign="center"; ctx.fillText(String(i+1),px,py+0.5);
     if (on){ ctx.fillStyle="#edf0f7"; ctx.textAlign="left"; ctx.font="600 12px "+getComputedStyle(document.body).fontFamily; ctx.fillText(s.name,px+17,py); }
   });
-  // listener: head, ears, nose (facing up)
   ctx.fillStyle="#edf0f7"; ctx.beginPath(); ctx.arc(v.cx,v.cy,9,0,Math.PI*2); ctx.fill();
   ctx.beginPath(); ctx.moveTo(v.cx-6,v.cy-6); ctx.lineTo(v.cx,v.cy-19); ctx.lineTo(v.cx+6,v.cy-6); ctx.fill();
   ctx.fillRect(v.cx-12,v.cy-3,4,7); ctx.fillRect(v.cx+8,v.cy-3,4,7);
@@ -595,7 +619,7 @@ map.addEventListener("pointermove",e=>{
   const nx=Math.round(Math.max(-15,Math.min(15,wx+drag.ox))*10)/10, ny=Math.round(Math.max(-15,Math.min(15,wy+drag.oy))*10)/10;
   const dx=nx-drag.lastX, dy=ny-drag.lastY; drag.lastX=nx; drag.lastY=ny;
   s.x=nx; s.y=ny;
-  const p=paths[s.id]; if (p){ for (let k=0;k<p.x.length;k++){ p.x[k]+=dx; p.y[k]+=dy; } }   // instant feedback; server confirms
+  const p=paths[s.id]; if (p){ for (let k=0;k<p.x.length;k++){ p.x[k]+=dx; p.y[k]+=dy; } }
   $("#rail-left").querySelectorAll("input[data-key]").forEach(inp=>{ if (inp.dataset.key==="x"||inp.dataset.key==="y") inp.closest(".row").refresh(); });
   markDirty(); fetchScene(); requestDraw();
 });

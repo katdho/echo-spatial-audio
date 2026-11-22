@@ -1,7 +1,7 @@
 
 """Spatial positioning and binaural propagation for ECHO.
 
-Coordinates are in metres, viewed from above:
+Coordinates are in meters, viewed from above:
 - The listener is at the origin, facing +y
 - +x points to the listener's right
 - The ears are at (-HEAD/2, 0) and (+HEAD/2, 0)
@@ -152,7 +152,7 @@ MOTIONS = {
 class Room:
     """Rectangular room used to generate first-order wall reflections
 
-    The listener is at the room centre. Each wall contributes one
+    The listener is at the room center. Each wall contributes one
     mirrored source position using the image-source method
     """
     width: float = 12.0

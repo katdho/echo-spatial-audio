@@ -17,7 +17,7 @@ SAY:
 ACTION: Click Doppler fly-by. Point to the line across the map.
 
 SAY:
-“A ticking sound flies past me at about 11 metres per second, three metres in front of me. A bass string sits still on my left as a reference. The room and reverb are off, so you can hear the basic spatial cues.”
+“A ticking sound flies past me at about 11 meters per second, three meters in front of me. A bass string sits still on my left as a reference. The room and reverb are off, so you can hear the basic spatial cues.”
 
 ACTION: Press Render and play. Let the scene play.
 
@@ -38,7 +38,7 @@ SAY:
 ACTION: Return to the browser. Click Start over twice, then choose Orbiting strings.
 
 SAY:
-“Now a plucked-string arpeggio circles my head in a 14-by-11-metre room, over a low drone.”
+“Now a plucked-string arpeggio circles my head in a 14-by-11-meter room, over a low drone.”
 
 ACTION: Press Render and play. While it plays, drag the drone to the right side of the map.
 
@@ -59,7 +59,7 @@ SAY:
 ACTION: Return to the browser. Click Start over twice, choose Distant cathedral, then render and play.
 
 SAY:
-“This scene uses the same engine with different settings: a 40-by-30-metre room, a dark seven-second reverb with predelay, and bell-like sounds moving in a slow spiral. The long reverb and distance-dependent filtering make the sounds feel far away.”
+“This scene uses the same engine with different settings: a 40-by-30-meter room, a dark seven-second reverb with predelay, and bell-like sounds moving in a slow spiral. The long reverb and distance-dependent filtering make the sounds feel far away.”
 
 2:50 — COMPOSITION SKETCH (about 45 seconds)
 ACTION: Click Start over twice, then choose Composition sketch. Point to the five sources on the map.
