@@ -3,7 +3,7 @@ Defines the visual theme, layout, controls, sound cards,
 studio panels, room map, playback bar, and responsive behavior
 
 HTML structure is defined in index.html
-Interface behavior is defined in app.js */
+Interface behavior is defined in js/ (entry point: js/app.js) */
 
 :root{
   --bg:#0f1320; --panel:#171c2b; --panel2:#1f2638; --line:#2c3652; --text:#edf0f7; --muted:#99a4bd;
