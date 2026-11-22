@@ -27,6 +27,7 @@ import threading
 import time
 import uuid
 import webbrowser
+import mimetypes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -39,6 +40,21 @@ from .spatial import Flyby, Orbit, Oscillate, Propagation, Room, Spiral, Static
 WEB_DIR = Path(__file__).parent / "web"
 MAX_UPLOAD = 100*1024*1024
 MAX_SOURCES = 12
+
+# Explicit content types for the web files. Python's mimetypes module reads the
+# operating system's registry, which can report the wrong type for .css or .js
+# (notably on Windows), and browsers refuse to apply a stylesheet that is not
+# served as text/css.
+CONTENT_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".css":  "text/css; charset=utf-8",
+    ".js":   "application/javascript; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".svg":  "image/svg+xml",
+    ".png":  "image/png",
+    ".ico":  "image/x-icon",
+}
+
 ARP = ["A3", "C4", "D4", "E4", "G4", "A4", "E4", "D4"]
 KINDS = [
     dict(id="arpeggio",
@@ -361,16 +377,30 @@ class Handler(BaseHTTPRequestHandler):
         return self.rfile.read(size)
 
     def do_GET(self):
-        """Serve the control panel or its sound catalog"""
+        """Serve the control panel, static assets, or sound catalog."""
         path = urlparse(self.path).path
+        if path == "/api/catalog":
+            self._json({"kinds": KINDS, "presets": PRESETS})
+            return
 
         if path in ("/", "/index.html"):
-            page = (WEB_DIR / "index.html").read_bytes()
-            self._send(200, page, "text/html; charset=utf-8")
-        elif path == "/api/catalog":
-            self._json({"kinds": KINDS, "presets": PRESETS})
+            file_path = WEB_DIR / "index.html"
         else:
+            file_path = (WEB_DIR / path.lstrip("/")).resolve()
+            try:
+                file_path.relative_to(WEB_DIR.resolve())
+            except ValueError:
+                self._error("Not found", 404)
+                return
+
+        if not file_path.is_file():
             self._error("Not found", 404)
+            return
+
+        content_type = CONTENT_TYPES.get(
+            file_path.suffix.lower(),
+            mimetypes.guess_type(str(file_path))[0] or "application/octet-stream")
+        self._send(200, file_path.read_bytes(), content_type)
 
     def do_POST(self):
         """Handle scene, render, upload, and sound-check requests"""

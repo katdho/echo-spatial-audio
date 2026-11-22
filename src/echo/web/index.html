@@ -1,217 +1,41 @@
-<!-- index.html: ECHO's control panel (page, styling and behavior)
+<!-- index.html: Main HTML structure for the ECHO web interface
 
-  Step 1  Choose sounds: demo scenes, built-in sounds, upload your own files
-  Step 2  Shape the scene: map in the center (drag sounds), per-sound sliders on
-          the left, room/reverb/echo on the right
-  Step 3  Listen: Render and play, watch the dots follow the audio, Export WAV
+Defines the setup screen, studio layout, sound controls,
+room map, playback controls, and add-sound dialog.
 
-  All states lives in one object (S). The page never makes sound itself: it posts
-  S to the server (/api/render) and plays the WAV that comes back.
-  No external libraries or downloads. Served by echo/webui.py
--->
+Styling is defined in style.css
+Interface behavior is defined in app.js -->
 
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ECHO: spatial audio instrument</title>
-<style>
-:root{
-  --bg:#0f1320; --panel:#171c2b; --panel2:#1f2638; --line:#2c3652; --text:#edf0f7; --muted:#99a4bd;
-  --gold:#ffcf6b; --gold-ink:#2a2000; --bad:#ff8585; --ok:#7be0b0; --c:#ffcf6b;
-  --font:"Avenir Next","Segoe UI Variable","Segoe UI",system-ui,-apple-system,sans-serif;
-}
-*{box-sizing:border-box}
-[hidden]{display:none!important}
-html,body{height:100%}
-body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 var(--font);display:flex;flex-direction:column;overflow:hidden}
-button,input,select{font:inherit;color:inherit}
-button{cursor:pointer}
-:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
-h1,h2,h3,p{margin:0}
-
-/* ---------- top bar ---------- */
-.top{display:flex;align-items:center;gap:24px;padding:0 20px;height:56px;border-bottom:1px solid var(--line);flex:none;background:var(--bg)}
-.brand{display:flex;align-items:baseline;gap:12px}
-.wordmark{font-size:26px;font-weight:800;letter-spacing:-.03em;padding-right:.5em;
-  text-shadow:.11em 0 0 rgba(255,207,107,.5),.22em 0 0 rgba(255,207,107,.25),.33em 0 0 rgba(255,207,107,.11)}
-.tag{color:var(--muted);font-size:13px}
-.steps{display:flex;gap:6px;list-style:none;margin:0 auto;padding:0}
-.steps button{background:none;border:1px solid transparent;border-radius:999px;padding:6px 14px;color:var(--muted);display:flex;gap:8px;align-items:center}
-.steps button .n{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;border:1px solid var(--line);font-size:11px}
-.steps button[aria-current=step]{color:var(--text);border-color:var(--line);background:var(--panel)}
-.steps button[aria-current=step] .n{background:var(--gold);border-color:var(--gold);color:var(--gold-ink);font-weight:700}
-.steps button.done .n{border-color:var(--gold);color:var(--gold)}
-.steps button:disabled{opacity:.4;cursor:default}
-.top-actions{display:flex;gap:8px}
-
-.btn{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 14px;text-decoration:none;color:var(--text);display:inline-flex;align-items:center;gap:8px}
-.btn:hover{border-color:#43507a}
-.btn.ghost{background:none}
-.btn.danger.armed{background:#3a1f28;border-color:var(--bad);color:var(--bad)}
-.btn.primary,.primary{background:var(--gold);border-color:var(--gold);color:var(--gold-ink);font-weight:700}
-.btn.primary:hover{filter:brightness(1.06)}
-.btn[disabled],.primary[disabled]{opacity:.45;cursor:not-allowed}
-.big{padding:11px 20px;font-size:15px;border-radius:10px}
-
-/* ---------- setup ---------- */
-.setup{flex:1;overflow:auto;display:flex;flex-direction:column}
-
-/* Full-width introduction and option sections */
-
-.setup-inner {
-  width: 100%;
-}
-
-.setup h1 {
-  max-width: none;
-}
-
-.lede {
-  max-width: none;
-}
-.setup-inner{
-  width:100%;
-  margin:0 auto;
-  padding:40px 24px 120px;
-  flex:1;
-}
-
-.setup h1{
-  font-size:34px;
-  line-height:1.15;
-  letter-spacing:-.02em;
-  font-weight:750;
-  max-width:none;
-}
-
-.lede{
-  color:var(--muted);
-  margin-top:10px;
-  max-width:none;
-  font-size:15px;
-}
-
-.setup section{margin-top:34px}
-.setup h2{font-size:16px;font-weight:650;margin-bottom:4px}
-.setup h2+p{color:var(--muted);margin-bottom:14px}
-.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:left;display:flex;flex-direction:column;gap:6px;position:relative}
-.card:hover{border-color:#43507a;background:var(--panel2)}
-.card b{font-weight:650}
-.card span{color:var(--muted);font-size:13px}
-.card canvas{width:100%;height:96px;border-radius:8px;background:#0c101c;margin-bottom:4px;display:block}
-.card .count{position:absolute;top:10px;right:10px;background:var(--gold);color:var(--gold-ink);border-radius:999px;min-width:22px;height:22px;display:grid;place-items:center;font-weight:700;font-size:12px;padding:0 6px}
-.kinds .card{padding:12px 14px}
-.extras{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px}
-.extra{background:var(--panel);border:1px dashed var(--line);border-radius:12px;padding:12px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.extra input[type=text]{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:130px}
-.setup-bar{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(15,19,32,0),var(--bg) 24%);padding:18px 24px 18px}
-.setup-bar-in{width:min(1040px,100%);margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
-.chips{display:flex;gap:8px;flex-wrap:wrap;flex:1;min-width:200px;align-items:center}
-.chips .empty{color:var(--muted)}
-.chip{display:inline-flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 10px}
-.chip i{width:9px;height:9px;border-radius:50%;background:var(--c)}
-.chip button{background:none;border:0;color:var(--muted);width:20px;height:20px;border-radius:50%;line-height:1}
-.chip button:hover{color:var(--text);background:var(--line)}
-.len{display:flex;align-items:center;gap:10px;color:var(--muted)}
-.len input{width:130px}
-.len output{color:var(--text);min-width:3.2em;font-variant-numeric:tabular-nums}
-
-/* ---------- studio ---------- */
-.studio{flex:1;min-height:0;display:grid;grid-template-columns:304px minmax(0,1fr) 304px}
-.rail{overflow:auto;padding:16px;background:var(--panel);display:flex;flex-direction:column;gap:14px}
-.rail.left{grid-column:1;grid-row:1;border-right:1px solid var(--line);--c:var(--gold)}
-.center{grid-column:2;grid-row:1}
-.rail.right{grid-column:3;grid-row:1;border-left:1px solid var(--line)}
-.src-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
-.src-item{display:flex;align-items:center;gap:4px;border:1px solid transparent;border-radius:10px;background:var(--panel2)}
-.src-item.sel{border-color:var(--c);box-shadow:0 0 0 1px var(--c) inset}
-.src-pick{flex:1;display:flex;align-items:center;gap:10px;background:none;border:0;padding:8px 6px 8px 10px;text-align:left;min-width:0}
-.src-pick i{width:11px;height:11px;border-radius:50%;background:var(--c);flex:none}
-.src-pick b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.src-pick small{color:var(--muted);margin-left:auto;white-space:nowrap}
-.src-rm{background:none;border:0;color:var(--muted);width:28px;height:28px;border-radius:8px;margin-right:4px}
-.src-rm:hover{color:var(--bad);background:var(--line)}
-.group{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:10px}
-.group-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.group-head h3{font-size:13px;font-weight:650}
-.link{background:none;border:0;color:var(--muted);padding:2px 4px;border-radius:4px;font-size:12px;text-decoration:underline;text-underline-offset:2px}
-.link:hover{color:var(--text)}
-.rail>.group:first-child{border-top:0;padding-top:0}
-.group.off .row,.group.off .field,.row.idle{opacity:.45}
-.row-top{display:flex;justify-content:space-between;gap:8px;font-size:13px}
-.row-top span:first-child{user-select:none}
-.val{color:var(--text);font-variant-numeric:tabular-nums;font-weight:600}
-.field{display:flex;flex-direction:column;gap:5px;font-size:13px}
-.field select{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 8px}
-.switch{position:relative;display:inline-block;width:34px;height:20px;flex:none}
-.switch input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
-.switch span{position:absolute;inset:0;border-radius:999px;background:var(--line);transition:background .15s}
-.switch span::after{content:"";position:absolute;left:3px;top:3px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .15s}
-.switch input:checked+span{background:var(--c,var(--gold))}
-.switch input:checked+span::after{transform:translateX(14px)}
-.switch input:focus-visible+span{outline:2px solid var(--gold);outline-offset:2px}
-.empty-note{color:var(--muted);padding:6px 2px}
-
-input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:20px;background:transparent;margin:0;--pct:50%;cursor:pointer}
-input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:linear-gradient(90deg,var(--c) var(--pct),var(--line) var(--pct))}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#fff;margin-top:-5px;border:2px solid var(--c)}
-input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(--line)}
-input[type=range]::-moz-range-progress{height:4px;border-radius:2px;background:var(--c)}
-input[type=range]::-moz-range-thumb{width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid var(--c)}
-.rail.right,.setup-bar,.transport{--c:var(--gold)}
-
-.center{display:flex;flex-direction:column;min-width:0;min-height:0}
-.map-wrap{flex:1;min-height:260px;position:relative}
-#map{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
-.hint{padding:8px 20px;color:var(--muted);font-size:13px;min-height:36px;border-top:1px solid var(--line)}
-.transport{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:12px 20px 14px;border-top:1px solid var(--line);background:var(--panel)}
-.player{display:flex;align-items:center;gap:12px;flex:1;min-width:260px}
-.player .play{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--panel2);display:grid;place-items:center;flex:none}
-.player .play:disabled{opacity:.4;cursor:default}
-.player input{flex:1}
-#time{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
-.status{flex-basis:100%;color:var(--muted);font-size:13px;min-height:19px}
-.status.err{color:var(--bad)}
-.status.ok{color:var(--ok)}
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--gold);margin-right:6px}
-
-dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:18px;width:min(560px,92vw)}
-dialog::backdrop{background:rgba(5,8,16,.6)}
-dialog h2{font-size:16px;margin-bottom:12px}
-dialog .cards{grid-template-columns:1fr 1fr}
-.dlg-foot{display:flex;justify-content:flex-end;margin-top:14px}
-
-@media (max-width:1000px){
-  .studio{display:block;overflow:auto}
-  .center{display:flex;flex-direction:column}
-  .map-wrap{flex:none;height:min(60vh,520px)}
-  .rail{overflow:visible;border:0!important;border-top:1px solid var(--line)!important}
-  .rail.right{border-left:0}
-  .steps button span:last-child{display:none}
-  .tag{display:none}
-}
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ECHO: spatial audio instrument</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
 </head>
 <body>
 
 <header class="top">
-  <div class="brand"><span class="wordmark">echo</span><span class="tag">spatial audio instrument</span></div>
+  <div class="brand">
+    <span class="wordmark">echo</span>
+    <span class="tag">spatial audio instrument</span>
+  </div>
+
   <ol class="steps" id="steps">
     <li><button data-step="0"><span class="n">1</span><span>Choose sounds</span></button></li>
     <li><button data-step="1"><span class="n">2</span><span>Shape the scene</span></button></li>
     <li><button data-step="2"><span class="n">3</span><span>Listen</span></button></li>
   </ol>
+
   <div class="top-actions">
     <button class="btn ghost" id="btn-reset" title="Put every slider back to where it started. Keeps your sounds.">Reset sliders</button>
     <button class="btn ghost danger" id="btn-start-over" title="Remove everything and go back to step 1.">Start over</button>
   </div>
 </header>
 
-<!-- ============ STEP 1 ============ -->
+<!-- STEP 1: Choose sounds -->
 <main class="setup" id="setup">
   <div class="setup-inner">
     <h1>You place sounds in a virtual room, move them around the listener, and it renders a stereo mix</h1>
@@ -227,38 +51,72 @@ dialog .cards{grid-template-columns:1fr 1fr}
       <h2>Option 2: Build Your Own</h2>
       <p>Click a sound to add it. Click again to add another copy</p>
       <div class="cards kinds" id="kind-grid"></div>
+
       <div class="extras">
-        <div class="extra"><span>Upload a recording</span>
+        <div class="extra">
+          <span>Upload a recording</span>
           <input type="file" id="file-input" accept="audio/*" hidden>
-          <button class="btn" id="btn-file">Choose a file</button></div>
-        <div class="extra"><span>Enter a Freesound ID</span>
+          <button class="btn" id="btn-file">Choose a file</button>
+        </div>
+
+        <div class="extra">
+          <span>Enter a Freesound ID</span>
           <input type="text" id="fs-id" placeholder="Freesound ID" inputmode="numeric" aria-label="Freesound ID">
-          <button class="btn" id="btn-fs">Add</button></div>
+          <button class="btn" id="btn-fs">Add</button>
+        </div>
       </div>
     </section>
   </div>
-  <div class="setup-bar"><div class="setup-bar-in">
-    <div class="chips" id="chips"></div>
-    <label class="len">Length <input type="range" id="len-setup" min="3" max="90" step="1" aria-label="Render length in seconds"><output id="len-setup-out"></output></label>
-    <button class="btn primary big" id="btn-build" disabled>Build scene</button>
-  </div></div>
+
+  <div class="setup-bar">
+    <div class="setup-bar-in">
+      <div class="chips" id="chips"></div>
+
+      <label class="len">
+        Length
+        <input type="range" id="len-setup" min="3" max="90" step="1" aria-label="Render length in seconds">
+        <output id="len-setup-out"></output>
+      </label>
+
+      <button class="btn primary big" id="btn-build" disabled>Build scene</button>
+    </div>
+  </div>
 </main>
 
-<!-- ============ STEP 2 + 3 ============ -->
+<!-- STEP 2 + 3: Shape and listen -->
 <main class="studio" id="studio" hidden>
   <section class="center">
-    <div class="map-wrap"><canvas id="map" aria-label="Top-down map of the room. Drag a sound to move it."></canvas></div>
+    <div class="map-wrap">
+      <canvas id="map" aria-label="Top-down map of the room. Drag a sound to move it."></canvas>
+    </div>
+
     <p class="hint" id="hint"></p>
+
     <div class="transport">
       <button class="btn primary big" id="btn-render">Render and play</button>
+
       <div class="player">
-        <button class="play" id="btn-play" disabled aria-label="Play"><svg width="14" height="14" viewBox="0 0 14 14" id="ico-play"><path d="M3 1.5v11l9-5.5z" fill="currentColor"/></svg></button>
+        <button class="play" id="btn-play" disabled aria-label="Play">
+          <svg width="14" height="14" viewBox="0 0 14 14" id="ico-play">
+            <path d="M3 1.5v11l9-5.5z" fill="currentColor"/>
+          </svg>
+        </button>
+
         <input type="range" id="scrub" min="0" max="1" step="0.01" value="0" disabled aria-label="Playback position">
+
         <span id="time">Render to listen</span>
+
         <button class="btn" id="btn-ab" hidden title="Switch between your last two renders at the same moment, to hear what your change did">Hear previous</button>
+
         <a class="btn" id="btn-export" download="ECHO_render.wav" hidden>Export WAV</a>
       </div>
-      <label class="len">Length <input type="range" id="len-studio" min="3" max="90" step="1" aria-label="Render length in seconds"><output id="len-studio-out"></output></label>
+
+      <label class="len">
+        Length
+        <input type="range" id="len-studio" min="3" max="90" step="1" aria-label="Render length in seconds">
+        <output id="len-studio-out"></output>
+      </label>
+
       <p class="status" id="status" role="status"></p>
     </div>
   </section>
@@ -270,554 +128,17 @@ dialog .cards{grid-template-columns:1fr 1fr}
 <dialog id="add-dialog">
   <h2>Add a sound</h2>
   <div class="cards kinds" id="dlg-grid"></div>
+
   <div class="extras">
-    <div class="extra"><button class="btn" id="dlg-file">Upload a file</button></div>
+    <div class="extra">
+      <button class="btn" id="dlg-file">Upload a file</button>
+    </div>
   </div>
-  <div class="dlg-foot"><button class="btn" id="dlg-close">Done</button></div>
+
+  <div class="dlg-foot">
+    <button class="btn" id="dlg-close">Done</button>
+  </div>
 </dialog>
 
-<script>
-"use strict";
-
-/* ------------------------------------------------------------------ constants */
-const COLORS = ["#5eead4","#ff8fab","#a78bfa","#7cc4ff","#fdba74","#d9f99d","#f0abfc","#fde68a"];
-const BASE = {motion:"Static",x:0,y:3,radius:4,speed:0.08,pass_time:6,start:0,gain:0,send:0.3,doppler:1,rolloff:1,air:1,shadow:1};
-const ROOM0 = {enabled:true,width:12,depth:10,absorption:0.35};
-const REVERB0 = {enabled:true,kind:"fdn",t60:2.5,damping:0.25,size:1,predelay:0.02,level_db:-6};
-const DELAY0 = {enabled:false,time:0.375,feedback:0.45,level_db:-8};
-const MOTIONS = [["Static","Stay put"],["Orbit","Circle around you"],["Spiral","Spiral in and out"],["Oscillate","Sweep left and right"],["Flyby","Fly past once"]];
-const PARAM_KEYS = ["motion","x","y","radius","speed","pass_time","start","gain","send","doppler","rolloff","air","shadow"];
-const HINT_DEFAULT = "Drag a sound on the map to move it. Hover any control to see what it does. Double-click a control's name to reset it.";
-
-/* ------------------------------------------------------------------ state */
-let catalog = {kinds:[], presets:[]};
-let S = freshState();
-let G0 = snapshot(S);
-let sel = 0;
-let view = 0;
-let paths = {};
-let rendered = null;
-let previous = null;
-let showingPrev = false;
-let dirty = false;
-let rendering = false;
-let built = false;
-
-function freshState(){ return {length:16, sources:[], room:{...ROOM0}, reverb:{...REVERB0}, delay:{...DELAY0}}; }
-function snapshot(s){ return JSON.parse(JSON.stringify(s)); }
-function payload(){ return JSON.stringify(S, (k,v)=> k==="def" ? undefined : v); }
-const colorOf = i => COLORS[i % COLORS.length];
-const uid = () => Math.random().toString(36).slice(2,9);
-const $ = (s,el=document) => el.querySelector(s);
-
-function h(tag, props={}, ...kids){
-  const e = document.createElement(tag);
-  for (const [k,v] of Object.entries(props)){
-    if (k==="class") e.className=v;
-    else if (k==="text") e.textContent=v;
-    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
-    else if (v===true) e.setAttribute(k,"");
-    else if (v!==false && v!=null) e.setAttribute(k,v);
-  }
-  for (const kid of kids.flat()){ if (kid==null||kid===false) continue; e.append(kid.nodeType ? kid : document.createTextNode(kid)); }
-  return e;
-}
-
-/* ------------------------------------------------------------------ sources */
-function kindInfo(id){ return catalog.kinds.find(k=>k.id===id) || {label:id,defaults:{}}; }
-function uniqueName(base){
-  const names = S.sources.map(s=>s.name); if (!names.includes(base)) return base;
-  let n=2; while (names.includes(`${base} ${n}`)) n++; return `${base} ${n}`;
-}
-function newSource(kind, over={}, arg="", name=""){
-  const info = kindInfo(kind);
-  const s = {id:uid(), kind, arg, name: name || uniqueName(info.label), ...BASE, ...info.defaults, ...over};
-  s.def = Object.fromEntries(PARAM_KEYS.map(k=>[k,s[k]]));
-  return s;
-}
-function addSource(kind, over={}, arg="", name=""){
-  if (S.sources.length >= 12){ say("That's the maximum of 12 sounds. Remove one to add another.","err"); return; }
-  S.sources.push(newSource(kind, over, arg, name));
-  sel = S.sources.length-1;
-  markDirty(); renderSetupBar(); fetchScene();
-}
-function removeSource(i){
-  S.sources.splice(i,1);
-  sel = Math.max(0, Math.min(sel, S.sources.length-1));
-  markDirty(); renderSetupBar(); renderLeft(); fetchScene();
-}
-
-/* ------------------------------------------------------------------ scene paths */
-let sceneBusy=false, scenePending=false;
-async function fetchScene(){
-  if (sceneBusy){ scenePending=true; return; }
-  sceneBusy=true;
-  try{
-    const r = await fetch("/api/scene",{method:"POST",body:payload()});
-    const j = await r.json();
-    if (j.paths) paths = j.paths;
-  }catch(e){ /* server stopped: the status line reports it on render */ }
-  sceneBusy=false;
-  if (scenePending){ scenePending=false; fetchScene(); }
-  requestDraw();
-}
-
-/* ------------------------------------------------------------------ status + dirty */
-function say(msg, kind=""){ const el=$("#status"); el.className="status "+kind; el.textContent=msg; }
-function markDirty(){
-  if (rendered && !dirty){ dirty=true; }
-  updateStatus(); updateButtons();
-}
-function updateStatus(){
-  const el=$("#status");
-  if (rendering) return;
-  if (!S.sources.length){ el.className="status"; el.textContent="Add a sound to get started."; return; }
-  if (rendered && dirty){ el.className="status"; el.replaceChildren(h("span",{class:"dot"}),"You changed something. Render again to hear it."); return; }
-  if (rendered){ return; }
-  el.className="status"; el.textContent="Ready. Press Render and play. It takes a few seconds.";
-}
-function updateButtons(){
-  const b=$("#btn-render");
-  b.disabled = rendering || !S.sources.length;
-  b.textContent = rendering ? "Rendering…" : (rendered ? "Render again" : "Render and play");
-  $("#btn-build").disabled = !S.sources.length;
-  const cur = view===0 ? 0 : (rendered ? 2 : 1);
-  document.querySelectorAll("#steps button").forEach((btn,i)=>{
-    if (i===cur) btn.setAttribute("aria-current","step"); else btn.removeAttribute("aria-current");
-    btn.classList.toggle("done", i<cur);
-    btn.disabled = (i>0 && !S.sources.length);
-  });
-}
-
-/* ------------------------------------------------------------------ controls */
-function showHint(t){ $("#hint").textContent = t || HINT_DEFAULT; }
-const num = (d,u="") => v => v.toFixed(d)+u;
-const db = v => (v>0?"+":"")+v.toFixed(1)+" dB";
-const pct = v => Math.round(v*100)+"%";
-
-function slider({label,min,max,step,get,set,def,fmt,hint,key,idle}){
-  const input = h("input",{type:"range",min,max,step,"aria-label":label,"data-key":key||""});
-  const val = h("span",{class:"val"});
-  const name = h("span",{text:label,title:"Double-click to reset"});
-  const row = h("div",{class:"row"}, h("div",{class:"row-top"},name,val), input);
-  const paint = ()=>{ val.textContent = fmt(+input.value); input.style.setProperty("--pct", ((input.value-min)/(max-min)*100)+"%"); };
-  const refresh = ()=>{ input.value=get(); paint(); };
-  input.addEventListener("input",()=>{ set(+input.value); paint(); onChange(); });
-  name.addEventListener("dblclick",()=>{ set(def()); refresh(); onChange(); });
-  row.addEventListener("mouseenter",()=>showHint(hint)); row.addEventListener("mouseleave",()=>showHint());
-  input.addEventListener("focus",()=>showHint(hint)); input.addEventListener("blur",()=>showHint());
-  const why = idle ? idle() : null;
-  if (why){ row.classList.add('idle'); row.title = 'No effect right now: '+why; }
-  row.refresh=refresh; row.input=input; refresh();
-  return row;
-}
-function toggle(label,get,set,hint){
-  const input=h("input",{type:"checkbox","aria-label":label}); input.checked=get();
-  const w=h("label",{class:"switch"},input,h("span"));
-  input.addEventListener("change",()=>{ set(input.checked); onChange(true); });
-  w.addEventListener("mouseenter",()=>showHint(hint)); w.addEventListener("mouseleave",()=>showHint());
-  return w;
-}
-function select(label,opts,get,set,hint){
-  const sel_=h("select",{"aria-label":label}, opts.map(([v,t])=>h("option",{value:v,text:t})));
-  sel_.value=get();
-  sel_.addEventListener("change",()=>{ set(sel_.value); onChange(true); });
-  const f=h("label",{class:"field"},h("span",{text:label}),sel_);
-  f.addEventListener("mouseenter",()=>showHint(hint)); f.addEventListener("mouseleave",()=>showHint());
-  return f;
-}
-function group(title,children,onReset,enabled){
-  const head=h("div",{class:"group-head"},h("h3",{text:title}));
-  const right=h("div",{style:"display:flex;gap:8px;align-items:center"});
-  if (enabled) right.append(enabled);
-  right.append(h("button",{class:"link",text:"Reset",title:"Put these controls back to where they started",onclick:()=>{onReset();onChange(true);}}));
-  head.append(right);
-  return h("div",{class:"group"},head,children);
-}
-
-function onChange(rebuild=false){
-  if (rebuild) { renderLeft(); renderRight(); }
-  markDirty(); fetchScene(); requestDraw();
-}
-
-/* --- left rail: sounds + per-sound controls --- */
-function renderLeft(){
-  const rail=$("#rail-left"); rail.replaceChildren();
-  rail.style.setProperty("--c", colorOf(sel));
-  const list=h("ul",{class:"src-list"});
-  S.sources.forEach((s,i)=>{
-    const li=h("li",{class:"src-item"+(i===sel?" sel":""),style:`--c:${colorOf(i)}`},
-      h("button",{class:"src-pick",onclick:()=>{sel=i;renderLeft();requestDraw();},"aria-pressed":i===sel},
-        h("i"),h("b",{text:s.name}),h("small",{text:motionLabel(s.motion)})),
-      h("button",{class:"src-rm","aria-label":`Remove ${s.name}`,title:"Remove this sound",text:"✕",onclick:()=>removeSource(i)}));
-    list.append(li);
-  });
-  rail.append(h("div",{class:"rail-head"},h("h2",{text:"Sounds"}),h("button",{class:"btn",text:"Add sound",onclick:()=>openAdd()})));
-  if (!S.sources.length){ rail.append(h("p",{class:"empty-note",text:"No sounds yet. Add one to place it on the map."})); return; }
-  rail.append(list);
-  const s=S.sources[sel]; if (!s) return;
-  const d = k => s.def[k];
-  const mk = (o)=>slider({...o,get:()=>s[o.key],set:v=>{s[o.key]=v;},def:()=>d(o.key)});
-  const sp = s.motion==="Oscillate" ? "swings/min" : "laps/min";
-  const radiusLabel = {Orbit:"Circle radius",Spiral:"Outer radius",Oscillate:"Sweep width (each side)",Flyby:"Pass distance (each side)"}[s.motion];
-  const moveRows=[ select("Path",MOTIONS,()=>s.motion,v=>{s.motion=v;},"How this sound travels around you.") ];
-  moveRows.push(mk({key:"x",label:"X-Position (Left/Right)",min:-15,max:15,step:0.1,fmt:v=>(v>0?"+":"")+v.toFixed(1)+" m",hint:"Position left (−) or right (+) of you, in meters. For moving sounds this is the center of the path. You can also drag it on the map."}));
-  moveRows.push(mk({key:"y",label:"Y-Position (Behind/Ahead)",min:-15,max:15,step:0.1,fmt:v=>(v>0?"+":"")+v.toFixed(1)+" m",hint:"Position behind (−) or ahead (+) of you. You sit in the center of the map facing up."}));
-  if (s.motion!=="Static") moveRows.push(mk({key:"radius",label:radiusLabel,min:0.5,max:40,step:0.5,fmt:num(1," m"),hint:"How big the movement is."}));
-  if (s.motion==="Orbit"||s.motion==="Spiral"||s.motion==="Oscillate")
-    moveRows.push(mk({key:"speed",label:"Speed",min:-0.5,max:0.5,step:0.005,fmt:v=>Math.abs(v)<0.0025?"still":(v>0?"↺ ":"↻ ")+Math.abs(v*60).toFixed(1)+" "+sp,hint:"How fast it moves. The arrow shows the direction seen on the map. Negative reverses it."}));
-  if (s.motion==="Flyby")
-    moveRows.push(mk({key:"pass_time",label:"Fly-by time",min:1,max:30,step:0.5,fmt:num(1," s"),hint:"How long the pass takes. A shorter pass is faster, so the pitch bend is stronger."}));
-  moveRows.push(mk({key:"start",label:"Starts at",min:0,max:S.length,step:0.5,fmt:num(1," s"),hint:"When this sound starts, in seconds from the beginning."}));
-  rail.append(group("Movement",moveRows,()=>{ PARAM_KEYS.slice(0,7).forEach(k=>s[k]=s.def[k]); }));
-  rail.append(group("Level",[
-    mk({key:"gain",label:"Volume",min:-30,max:6,step:0.5,fmt:db,hint:"How loud this sound is before it travels around."}),
-    mk({key:"send",label:"Reverb amount",min:0,max:1,step:0.01,fmt:pct,hint:"How much goes into the reverb. More makes it sound farther away and washier.",idle:()=>S.reverb.enabled?null:"the reverb is switched off (right side)."}),
-  ],()=>{ ["gain","send"].forEach(k=>s[k]=s.def[k]); }));
-  rail.append(group("Realism",[
-    mk({key:"doppler",label:"Pitch bend (Doppler)",min:0,max:3,step:0.05,fmt:v=>v===0?"off":v.toFixed(2)+"×",hint:"Pitch changes as a sound moves toward or away from you. 0 is off, 1 is like real life, higher is exaggerated.",idle:()=>s.motion==="Static"?"this sound isn't moving, so there is no pitch bend.":null}),
-    mk({key:"rolloff",label:"Distance fade",min:0,max:2,step:0.05,fmt:num(2),hint:"How quickly it gets quieter with distance. 1 is realistic. 0 keeps the same volume everywhere."}),
-    mk({key:"air",label:"Distance dulling",min:0,max:4,step:0.05,fmt:num(2),hint:"How much treble is lost over distance. Higher makes faraway sounds duller."}),
-    mk({key:"shadow",label:"Head shadow",min:0,max:1,step:0.01,fmt:pct,hint:"How much your head muffles the ear facing away from the sound."}),
-  ],()=>{ ["doppler","rolloff","air","shadow"].forEach(k=>s[k]=s.def[k]); }));
-}
-function motionLabel(m){ return (MOTIONS.find(x=>x[0]===m)||[0,m])[1].split(" ")[0]; }
-
-/* --- right rail: room / reverb / delay --- */
-function renderRight(){
-  const rail=$("#rail-right"); rail.replaceChildren();
-  const R=S.room, V=S.reverb, D=S.delay, g=G0;
-  const mkG=(obj,gobj,o)=>slider({...o,get:()=>obj[o.key],set:v=>{obj[o.key]=v;},def:()=>gobj[o.key]});
-  const grp=(title,obj,gobj,rows,keys,hint)=>{
-    const gp=group(title,rows,()=>{ keys.forEach(k=>obj[k]=gobj[k]); },
-      toggle(`${title} on or off`,()=>obj.enabled,v=>{obj.enabled=v; gp.classList.toggle("off",!v);},hint));
-    gp.classList.toggle("off",!obj.enabled); return gp;
-  };
-  rail.append(grp("Room",R,g.room,[
-    mkG(R,g.room,{key:"width",label:"Width",min:4,max:60,step:0.5,fmt:num(1," m"),hint:"Wider rooms push the echoes off the side walls later."}),
-    mkG(R,g.room,{key:"depth",label:"Depth",min:4,max:60,step:0.5,fmt:num(1," m"),hint:"Deeper rooms push the front and back echoes later."}),
-    mkG(R,g.room,{key:"absorption",label:"Wall softness",min:0,max:1,step:0.01,fmt:pct,hint:"0% is bare, bright walls with strong echoes. 100% soaks everything up."}),
-  ],["enabled","width","depth","absorption"],"Turns the wall echoes on or off."));
-  rail.append(grp("Reverb",V,g.reverb,[
-    select("Type",[["fdn","Smooth (feedback network)"],["schroeder","Classic (Schroeder)"]],()=>V.kind,v=>{V.kind=v;},"The reverb algorithm. Smooth is denser; Classic is the one from the course notes."),
-    mkG(V,g.reverb,{key:"t60",label:"Decay time",min:0.3,max:10,step:0.1,fmt:num(1," s"),hint:"How long the tail takes to fade away (T60)."}),
-    mkG(V,g.reverb,{key:"damping",label:"Darkness",min:0,max:0.5,step:0.01,fmt:num(2),hint:"Higher makes the tail duller as it fades."}),
-    mkG(V,g.reverb,{key:"size",label:"Space size",min:0.5,max:2.5,step:0.05,fmt:num(2,"×"),hint:"Stretches the internal delay lengths. Larger sounds like a bigger space."}),
-    mkG(V,g.reverb,{key:"predelay",label:"Pre-delay",min:0,max:0.2,step:0.005,fmt:v=>Math.round(v*1000)+" ms",hint:"Silent gap before the reverb starts."}),
-    mkG(V,g.reverb,{key:"level_db",label:"Level",min:-30,max:6,step:0.5,fmt:db,hint:"How loud the reverb is in the mix."}),
-  ],["enabled","kind","t60","damping","size","predelay","level_db"],"Turns the reverb on or off."));
-  rail.append(grp("Ping-pong echo",D,g.delay,[
-    mkG(D,g.delay,{key:"time",label:"Time between echoes",min:0.05,max:1.5,step:0.005,fmt:v=>Math.round(v*1000)+" ms",hint:"Gap between repeats. Each repeat bounces to the other ear."}),
-    mkG(D,g.delay,{key:"feedback",label:"Repeats",min:0,max:0.95,step:0.01,fmt:pct,hint:"How many times it repeats. Higher lasts longer."}),
-    mkG(D,g.delay,{key:"level_db",label:"Level",min:-30,max:6,step:0.5,fmt:db,hint:"How loud the echoes are."}),
-  ],["enabled","time","feedback","level_db"],"Turns the echo on or off."));
-}
-
-/* ------------------------------------------------------------------ map */
-const map = $("#map"), ctx = map.getContext("2d");
-let drawQueued=false, frozenView=null, drag=null;
-function requestDraw(){ if (drawQueued) return; drawQueued=true; requestAnimationFrame(()=>{drawQueued=false; draw();}); }
-
-function computeView(w,h_){
-  let rx=8, ry=8;
-  if (S.room.enabled){ rx=Math.max(rx,S.room.width/2); ry=Math.max(ry,S.room.depth/2); }
-  for (const s of S.sources){
-    const p=paths[s.id]; rx=Math.max(rx,Math.abs(s.x)); ry=Math.max(ry,Math.abs(s.y));
-    if (p){ for (let i=0;i<p.x.length;i+=3){ rx=Math.max(rx,Math.abs(p.x[i])); ry=Math.max(ry,Math.abs(p.y[i])); } }
-  }
-  rx*=1.14; ry*=1.14;
-  return {sc:Math.min((w/2)/rx,(h_/2)/ry), cx:w/2, cy:h_/2};
-}
-const toS=(v,x,y)=>[v.cx+x*v.sc, v.cy-y*v.sc];
-const toW=(v,sx,sy)=>[(sx-v.cx)/v.sc, (v.cy-sy)/v.sc];
-
-function posAt(s,t){
-  const p=paths[s.id]; if (!p) return [s.x,s.y];
-  const n=p.x.length, f=Math.max(0,Math.min(1,t/Math.max(S.length,0.001)))*(n-1), i=Math.floor(f), u=f-i, j=Math.min(i+1,n-1);
-  return [p.x[i]+(p.x[j]-p.x[i])*u, p.y[i]+(p.y[j]-p.y[i])*u];
-}
-const playT = () => (rendered && audio) ? audio.currentTime : 0;
-
-function resizeCanvas(){
-  const dpr=window.devicePixelRatio||1, r=map.getBoundingClientRect();
-  if (map.width!==Math.round(r.width*dpr)||map.height!==Math.round(r.height*dpr)){ map.width=Math.round(r.width*dpr); map.height=Math.round(r.height*dpr); }
-  return {w:r.width,h:r.height,dpr};
-}
-function draw(){
-  if (view!==1) return;
-  const {w,h:hh,dpr}=resizeCanvas();
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.clearRect(0,0,w,hh);
-  const bg=ctx.createRadialGradient(w/2,hh/2,10,w/2,hh/2,Math.max(w,hh)*0.7);
-  bg.addColorStop(0,"#161d31"); bg.addColorStop(1,"#0c101c");
-  ctx.fillStyle=bg; ctx.fillRect(0,0,w,hh);
-  const v = frozenView || computeView(w,hh);
-  const maxR = Math.max(w,hh)/2/v.sc;
-  const steps=[1,2,5,10,20,50]; const step=steps.find(s=>maxR/s<=7)||50;
-  ctx.lineWidth=1; ctx.font="11px "+getComputedStyle(document.body).fontFamily; ctx.textBaseline="middle";
-  for (let r=step;r<maxR*1.5;r+=step){
-    ctx.strokeStyle="rgba(150,165,205,.13)"; ctx.beginPath(); ctx.arc(v.cx,v.cy,r*v.sc,0,Math.PI*2); ctx.stroke();
-    ctx.fillStyle="rgba(150,165,205,.55)"; ctx.textAlign="left"; ctx.fillText(r+" m",v.cx+r*v.sc*0.7071+4,v.cy-r*v.sc*0.7071);
-  }
-  ctx.strokeStyle="rgba(150,165,205,.12)"; ctx.beginPath(); ctx.moveTo(0,v.cy); ctx.lineTo(w,v.cy); ctx.moveTo(v.cx,0); ctx.lineTo(v.cx,hh); ctx.stroke();
-  if (S.room.enabled){
-    const [x0,y0]=toS(v,-S.room.width/2,S.room.depth/2), rw=S.room.width*v.sc, rh=S.room.depth*v.sc;
-    ctx.fillStyle="rgba(255,207,107,.045)"; ctx.fillRect(x0,y0,rw,rh);
-    ctx.strokeStyle="rgba(255,207,107,.55)"; ctx.lineWidth=2; ctx.strokeRect(x0,y0,rw,rh);
-    ctx.fillStyle="rgba(255,207,107,.8)"; ctx.textAlign="left"; ctx.fillText(`room ${S.room.width.toFixed(0)} × ${S.room.depth.toFixed(0)} m`,x0+8,y0+14);
-  }
-  ctx.fillStyle="rgba(190,200,225,.6)"; ctx.font="600 12px "+getComputedStyle(document.body).fontFamily; ctx.textAlign="center";
-  ctx.fillText("ahead",v.cx,14); ctx.fillText("behind",v.cx,hh-12);
-  ctx.textAlign="left"; ctx.fillText("left",8,v.cy-12); ctx.textAlign="right"; ctx.fillText("right",w-8,v.cy-12);
-  const t=playT();
-  S.sources.forEach((s,i)=>{
-    const p=paths[s.id], col=colorOf(i), on=i===sel;
-    if (p && s.motion!=="Static"){
-      ctx.strokeStyle=col; ctx.globalAlpha=on?0.9:0.38; ctx.lineWidth=on?2.5:1.5; ctx.setLineDash(on?[]:[5,5]);
-      ctx.beginPath(); for (let k=0;k<p.x.length;k++){ const [sx,sy]=toS(v,p.x[k],p.y[k]); k?ctx.lineTo(sx,sy):ctx.moveTo(sx,sy); } ctx.stroke();
-      ctx.setLineDash([]); ctx.globalAlpha=1;
-      const [ax,ay]=toS(v,s.x,s.y);
-      ctx.strokeStyle=col; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(ax,ay,on?7:5,0,Math.PI*2); ctx.moveTo(ax-4,ay); ctx.lineTo(ax+4,ay); ctx.moveTo(ax,ay-4); ctx.lineTo(ax,ay+4); ctx.stroke();
-    }
-    const [px,py]=toS(v,...posAt(s,t)), live = !rendered || t>=s.start;
-    ctx.globalAlpha=live?1:0.4;
-    if (rendered && !audio.paused && live){ ctx.shadowColor=col; ctx.shadowBlur=18; }
-    ctx.fillStyle=col; ctx.beginPath(); ctx.arc(px,py,on?12:10,0,Math.PI*2); ctx.fill();
-    ctx.shadowBlur=0; ctx.globalAlpha=1;
-    ctx.fillStyle="#0c101c"; ctx.font="700 12px "+getComputedStyle(document.body).fontFamily; ctx.textAlign="center"; ctx.fillText(String(i+1),px,py+0.5);
-    if (on){ ctx.fillStyle="#edf0f7"; ctx.textAlign="left"; ctx.font="600 12px "+getComputedStyle(document.body).fontFamily; ctx.fillText(s.name,px+17,py); }
-  });
-  ctx.fillStyle="#edf0f7"; ctx.beginPath(); ctx.arc(v.cx,v.cy,9,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(v.cx-6,v.cy-6); ctx.lineTo(v.cx,v.cy-19); ctx.lineTo(v.cx+6,v.cy-6); ctx.fill();
-  ctx.fillRect(v.cx-12,v.cy-3,4,7); ctx.fillRect(v.cx+8,v.cy-3,4,7);
-  ctx.fillStyle="rgba(190,200,225,.7)"; ctx.font="12px "+getComputedStyle(document.body).fontFamily; ctx.textAlign="left"; ctx.fillText("you",v.cx+16,v.cy+14);
-  if (!S.sources.length){ ctx.fillStyle="rgba(190,200,225,.7)"; ctx.textAlign="center"; ctx.font="14px "+getComputedStyle(document.body).fontFamily; ctx.fillText("Add a sound to see it here.",v.cx,v.cy+60); }
-}
-
-/* drag sounds on the map */
-function pointer(e){ const r=map.getBoundingClientRect(); return [e.clientX-r.left,e.clientY-r.top]; }
-function hit(sx,sy){
-  const v=computeView(map.clientWidth,map.clientHeight), t=playT();
-  for (let i=S.sources.length-1;i>=0;i--){
-    const s=S.sources[i];
-    for (const [x,y] of [[s.x,s.y],posAt(s,t)]){ const [px,py]=toS(v,x,y); if (Math.hypot(px-sx,py-sy)<=15) return i; }
-  }
-  return -1;
-}
-map.addEventListener("pointerdown",e=>{
-  const [sx,sy]=pointer(e), i=hit(sx,sy); if (i<0) return;
-  if (i!==sel){ sel=i; renderLeft(); }
-  const v=computeView(map.clientWidth,map.clientHeight), s=S.sources[i], [wx,wy]=toW(v,sx,sy);
-  frozenView=v; drag={i,ox:s.x-wx,oy:s.y-wy,lastX:s.x,lastY:s.y};
-  map.setPointerCapture(e.pointerId); showHint("Release to drop it here.");
-});
-map.addEventListener("pointermove",e=>{
-  const [sx,sy]=pointer(e);
-  if (!drag){ map.style.cursor = hit(sx,sy)>=0 ? "grab" : "default"; return; }
-  map.style.cursor="grabbing";
-  const s=S.sources[drag.i], [wx,wy]=toW(frozenView,sx,sy);
-  const nx=Math.round(Math.max(-15,Math.min(15,wx+drag.ox))*10)/10, ny=Math.round(Math.max(-15,Math.min(15,wy+drag.oy))*10)/10;
-  const dx=nx-drag.lastX, dy=ny-drag.lastY; drag.lastX=nx; drag.lastY=ny;
-  s.x=nx; s.y=ny;
-  const p=paths[s.id]; if (p){ for (let k=0;k<p.x.length;k++){ p.x[k]+=dx; p.y[k]+=dy; } }
-  $("#rail-left").querySelectorAll("input[data-key]").forEach(inp=>{ if (inp.dataset.key==="x"||inp.dataset.key==="y") inp.closest(".row").refresh(); });
-  markDirty(); fetchScene(); requestDraw();
-});
-const endDrag=()=>{ if (drag){ drag=null; frozenView=null; showHint(); requestDraw(); } };
-map.addEventListener("pointerup",endDrag); map.addEventListener("pointercancel",endDrag);
-window.addEventListener("resize",requestDraw);
-
-/* ------------------------------------------------------------------ render + playback */
-const audio = new Audio();
-audio.addEventListener("timeupdate",()=>{ updatePlayer(); requestDraw(); });
-audio.addEventListener("ended",()=>{ audio.currentTime=0; updatePlayer(); requestDraw(); });
-audio.addEventListener("play",()=>{ loop(); updatePlayer(); });
-audio.addEventListener("pause",()=>{ updatePlayer(); requestDraw(); });
-function loop(){ requestDraw(); if (!audio.paused) requestAnimationFrame(loop); }
-const fmtT = s => { s=Math.max(0,s); return Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0"); };
-function updatePlayer(){
-  const ok=!!rendered, dur=ok?(audio.duration||rendered.duration):0;
-  $("#btn-play").disabled=!ok; $("#scrub").disabled=!ok;
-  $("#time").textContent = ok ? `${fmtT(audio.currentTime)} / ${fmtT(dur)}` : "Render to listen";
-  const sc=$("#scrub"); if (ok){ sc.max=dur; if (document.activeElement!==sc) sc.value=audio.currentTime; sc.style.setProperty("--pct",(audio.currentTime/dur*100)+"%"); }
-  $("#ico-play").innerHTML = audio.paused ? '<path d="M3 1.5v11l9-5.5z" fill="currentColor"/>' : '<path d="M2.5 1.5h3v11h-3zM8.5 1.5h3v11h-3z" fill="currentColor"/>';
-  $("#btn-play").setAttribute("aria-label", audio.paused ? "Play" : "Pause");
-  $("#btn-export").hidden=!ok;
-  $("#btn-ab").hidden=!(ok&&previous); $("#btn-ab").textContent=showingPrev?"Hear latest":"Hear previous";
-}
-async function doRender(){
-  if (rendering || !S.sources.length) return;
-  rendering=true; updateButtons(); audio.pause();
-  const t0=performance.now(), timer=setInterval(()=>say(`Rendering… ${((performance.now()-t0)/1000).toFixed(0)} s. Longer scenes and bigger reverbs take longer.`),500);
-  say("Rendering…");
-  try{
-    const r=await fetch("/api/render",{method:"POST",body:payload()});
-    if (!r.ok){ const j=await r.json().catch(()=>({})); throw new Error(j.error||`Server error ${r.status}`); }
-    const blob=await r.blob();
-    if (previous) URL.revokeObjectURL(previous.url);
-    previous = rendered; showingPrev=false;
-    rendered={url:URL.createObjectURL(blob),duration:parseFloat(r.headers.get("X-Duration"))||0};
-    audio.src=rendered.url; audio.load(); $("#btn-export").href=rendered.url;
-    dirty=false; clearInterval(timer);
-    const ch=parseFloat(r.headers.get("X-Change"));
-    let msg=`Rendered ${rendered.duration.toFixed(1)} s, including the reverb and echo tail. Playing now. Headphones on.`;
-    if (!isNaN(ch)) msg += ch<0.005 ? " The audio is identical to your last render. Either nothing changed, or the control you moved has no effect in this scene." : ` Difference from your last render: ${Math.round(ch*100)}%. Use Hear previous to compare.`;
-    say(msg, !isNaN(ch)&&ch<0.005 ? "err" : "ok");
-    audio.currentTime=0; updatePlayer();
-    audio.play().catch(()=>say("Rendered. Press the play button to listen.","ok"));
-  }catch(err){
-    clearInterval(timer);
-    say(err.message==="Failed to fetch" ? "Lost contact with ECHO. Check that python app.py is still running." : err.message,"err");
-  }finally{ clearInterval(timer); rendering=false; updateButtons(); updatePlayer(); }
-}
-$("#btn-render").addEventListener("click",doRender);
-$("#btn-play").addEventListener("click",()=>{ audio.paused ? audio.play() : audio.pause(); });
-$("#btn-ab").addEventListener("click",()=>{
-  const t=audio.currentTime, wasPlaying=!audio.paused, target=showingPrev?rendered:previous;
-  showingPrev=!showingPrev; audio.src=target.url; audio.load();
-  audio.addEventListener("loadedmetadata",()=>{ audio.currentTime=Math.min(t,audio.duration||t); if (wasPlaying||true) audio.play().catch(()=>{}); updatePlayer(); },{once:true});
-  say(showingPrev?"Playing the previous render.":"Playing the latest render.");
-});
-$("#scrub").addEventListener("input",e=>{ audio.currentTime=+e.target.value; });
-document.addEventListener("keydown",e=>{
-  if (view!==1 || e.target.closest("select,input[type=text],dialog")) return;
-  if (e.key===" " && !e.target.closest("button")){ e.preventDefault(); if (rendered) audio.paused?audio.play():audio.pause(); else doRender(); }
-  if ((e.key==="r"||e.key==="R") && !e.metaKey && !e.ctrlKey){ doRender(); }
-});
-
-/* ------------------------------------------------------------------ views */
-function go(v){
-  view=v; $("#setup").hidden=v!==0; $("#studio").hidden=v!==1;
-  if (v===1){ if (sel>=S.sources.length) sel=0; renderLeft(); renderRight(); showHint(); requestAnimationFrame(()=>{ draw(); }); fetchScene(); updateStatus(); }
-  else { renderSetup(); }
-  updateButtons(); updatePlayer();
-}
-document.querySelectorAll("#steps button").forEach(b=>b.addEventListener("click",()=>{
-  const i=+b.dataset.step; if (i===0) go(0); else if (i===1) go(1); else { go(1); rendered ? (audio.paused?audio.play():audio.pause()) : doRender(); }
-}));
-$("#btn-build").addEventListener("click",()=>{ if (!built) G0=snapshot({...S,sources:[]}); built=true; go(1); });
-
-/* reset + start over */
-$("#btn-reset").addEventListener("click",()=>{
-  if (view===0){ return; }
-  S.length=G0.length; S.room={...G0.room}; S.reverb={...G0.reverb}; S.delay={...G0.delay};
-  S.sources.forEach(s=>PARAM_KEYS.forEach(k=>s[k]=s.def[k]));
-  syncLength(); renderLeft(); renderRight(); markDirty(); fetchScene(); requestDraw(); say("Sliders reset. Your sounds are unchanged.");
-});
-let armTimer=null;
-$("#btn-start-over").addEventListener("click",e=>{
-  const b=e.currentTarget;
-  if (!b.classList.contains("armed")){
-    b.classList.add("armed"); b.textContent="Click again to clear everything";
-    armTimer=setTimeout(()=>disarm(b),3500); return;
-  }
-  disarm(b); audio.pause(); if (rendered) URL.revokeObjectURL(rendered.url);
-  rendered=null; if (previous){URL.revokeObjectURL(previous.url); previous=null;} showingPrev=false; dirty=false; audio.removeAttribute("src"); S=freshState(); G0=snapshot(S); built=false; paths={}; sel=0; syncLength();
-  go(0); say("");
-});
-function disarm(b){ clearTimeout(armTimer); b.classList.remove("armed"); b.textContent="Start over"; }
-
-/* length sliders (one in each view, kept in sync) */
-function syncLength(){
-  for (const id of ["len-setup","len-studio"]){ const el=$("#"+id); el.value=S.length; el.style.setProperty("--pct",((S.length-3)/87*100)+"%"); $("#"+id+"-out").textContent=S.length+" s"; }
-  document.querySelectorAll('#rail-left input[data-key="start"]').forEach(inp=>{ inp.max=S.length; if (+inp.value>S.length){ inp.value=S.length; inp.dispatchEvent(new Event("input")); } });
-}
-for (const id of ["len-setup","len-studio"]) $("#"+id).addEventListener("input",e=>{ S.length=+e.target.value; syncLength(); markDirty(); fetchScene(); requestDraw(); });
-
-/* ------------------------------------------------------------------ step 1 UI */
-function renderSetup(){
-  const kg=$("#kind-grid"); kg.replaceChildren();
-  for (const k of catalog.kinds.filter(k=>!k.hidden)){
-    const n=S.sources.filter(s=>s.kind===k.id).length;
-    kg.append(h("button",{class:"card",onclick:()=>{ addSource(k.id); renderSetup(); }},
-      n?h("i",{class:"count",text:String(n)}):null, h("b",{text:k.label}), h("span",{text:k.blurb})));
-  }
-  renderSetupBar();
-}
-function renderSetupBar(){
-  const c=$("#chips"); c.replaceChildren();
-  if (!S.sources.length) c.append(h("span",{class:"empty",text:"No sounds yet. Click one above or open a demo."}));
-  S.sources.forEach((s,i)=>c.append(h("span",{class:"chip",style:`--c:${colorOf(i)}`},h("i"),s.name,
-    h("button",{"aria-label":`Remove ${s.name}`,text:"✕",onclick:()=>{ removeSource(i); renderSetup(); }}))));
-  $("#btn-build").disabled=!S.sources.length;
-  $("#btn-build").textContent = built ? "Back to scene" : "Build scene";
-  updateButtons();
-}
-function loadPreset(p){
-  audio.pause(); if (previous){URL.revokeObjectURL(previous.url); previous=null;} showingPrev=false; if (rendered){ URL.revokeObjectURL(rendered.url); rendered=null; dirty=false; audio.removeAttribute("src"); }
-  S={length:p.length,sources:[],room:{...ROOM0,...p.room},reverb:{...REVERB0,...p.reverb},delay:{...DELAY0,...p.delay}};
-  for (const d of p.sources){ const {kind,name,...over}=d; S.sources.push(newSource(kind,over,"",name)); }
-  G0=snapshot(S); built=true; sel=0; paths={}; syncLength(); go(1);
-  say(`Loaded "${p.label}". Press Render and play, or drag sounds on the map first.`);
-}
-function presetState(p){
-  const st={length:p.length,sources:[],room:{...ROOM0,...p.room}};
-  for (const d of p.sources){ const {kind,name,...over}=d; const s=newSource(kind,over,"",name); st.sources.push(s); }
-  return st;
-}
-async function renderPresetCards(){
-  const grid=$("#preset-grid"); grid.replaceChildren();
-  for (const p of catalog.presets){
-    const cv=h("canvas",{width:460,height:200,"aria-hidden":"true"});
-    grid.append(h("button",{class:"card",onclick:()=>loadPreset(p)},cv,h("b",{text:p.label}),h("span",{text:p.blurb})));
-    const st=presetState(p);
-    fetch("/api/scene",{method:"POST",body:JSON.stringify(st,(k,v)=>k==="def"?undefined:v)}).then(r=>r.json()).then(j=>drawMini(cv,st,j.paths)).catch(()=>{});
-  }
-}
-function drawMini(cv,st,ps){
-  const c=cv.getContext("2d"), w=cv.width, hh=cv.height; let rx=6, ry=6;
-  if (st.room.enabled){ rx=Math.max(rx,st.room.width/2); ry=Math.max(ry,st.room.depth/2); }
-  for (const s of st.sources){ const p=ps[s.id]; if(!p) continue; for(let i=0;i<p.x.length;i+=5){ rx=Math.max(rx,Math.abs(p.x[i])); ry=Math.max(ry,Math.abs(p.y[i])); } }
-  rx*=1.1; ry*=1.1; const sc=Math.min(w/2/rx,hh/2/ry), cx=w/2, cy=hh/2;
-  c.clearRect(0,0,w,hh);
-  if (st.room.enabled){ c.strokeStyle="rgba(255,207,107,.6)"; c.lineWidth=2; c.strokeRect(cx-st.room.width/2*sc,cy-st.room.depth/2*sc,st.room.width*sc,st.room.depth*sc); }
-  st.sources.forEach((s,i)=>{
-    const p=ps[s.id]; if(!p) return; c.strokeStyle=colorOf(i); c.lineWidth=3; c.globalAlpha=.85; c.beginPath();
-    for (let k=0;k<p.x.length;k++){ const X=cx+p.x[k]*sc, Y=cy-p.y[k]*sc; k?c.lineTo(X,Y):c.moveTo(X,Y); } c.stroke(); c.globalAlpha=1;
-    c.fillStyle=colorOf(i); c.beginPath(); c.arc(cx+p.x[0]*sc,cy-p.y[0]*sc,6,0,7); c.fill();
-  });
-  c.fillStyle="#edf0f7"; c.beginPath(); c.arc(cx,cy,6,0,7); c.fill();
-}
-
-/* add-sound dialog (inside the studio) */
-const dlg=$("#add-dialog");
-function openAdd(){
-  const g=$("#dlg-grid"); g.replaceChildren();
-  for (const k of catalog.kinds.filter(k=>!k.hidden))
-    g.append(h("button",{class:"card",onclick:()=>{ addSource(k.id); renderLeft(); requestDraw(); say(`Added ${S.sources[sel].name}.`); dlg.close(); }},h("b",{text:k.label}),h("span",{text:k.blurb})));
-  dlg.showModal();
-}
-$("#dlg-close").addEventListener("click",()=>dlg.close());
-
-/* upload + freesound */
-async function uploadFile(f){
-  if (!f) return;
-  say(`Loading ${f.name}…`);
-  try{
-    const r=await fetch("/api/upload?name="+encodeURIComponent(f.name),{method:"POST",body:f});
-    const j=await r.json(); if (!r.ok) throw new Error(j.error);
-    addSource("file",{},j.id,uniqueName(j.name.replace(/\.[^.]+$/,"")));
-    say(`Added ${S.sources[sel].name} (${j.seconds} s).`,"ok");
-    if (view===0) renderSetup(); else renderLeft();
-  }catch(err){ say(err.message,"err"); alert(err.message); }
-}
-$("#btn-file").addEventListener("click",()=>$("#file-input").click());
-$("#dlg-file").addEventListener("click",()=>{ dlg.close(); $("#file-input").click(); });
-$("#file-input").addEventListener("change",e=>{ uploadFile(e.target.files[0]); e.target.value=""; });
-$("#btn-fs").addEventListener("click",async()=>{
-  const id=$("#fs-id").value.trim(); if (!/^\d+$/.test(id)){ alert("Enter the number from the Freesound page address."); return; }
-  try{
-    const r=await fetch("/api/probe",{method:"POST",body:JSON.stringify({kind:"freesound",arg:id})}); const j=await r.json(); if (!r.ok) throw new Error(j.error);
-    addSource("freesound",{},id,uniqueName("Freesound "+id)); renderSetup(); $("#fs-id").value="";
-  }catch(err){ alert("Couldn't fetch that sound: "+err.message); }
-});
-
-/* ------------------------------------------------------------------ boot */
-(async function(){
-  try{ catalog = await (await fetch("/api/catalog")).json(); }
-  catch(e){ document.body.innerHTML='<p style="padding:40px">Can\'t reach ECHO. Start it with <code>python app.py</code>.</p>'; return; }
-  syncLength(); renderSetup(); renderPresetCards(); updateButtons(); updatePlayer();
-})();
-</script>
 </body>
 </html>
