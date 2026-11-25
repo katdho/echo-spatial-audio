@@ -481,39 +481,46 @@ class Handler(BaseHTTPRequestHandler):
             "name": name,
             "seconds": info["seconds"]})
 
-
-def _make_server(port: int) -> ThreadingHTTPServer:
-    """Create the local server, trying the requested port and the next 19 ports."""
+def _make_server(port: int, host: str = "127.0.0.1", 
+                    find_free_port: bool = True) -> ThreadingHTTPServer:
+    """Create the HTTP server
+    Local development can try the next 19 ports if needed.
+    Deployment binds directly to the assigned port
+    """
+    ports = range(port, port+20) if find_free_port else (port,)
     last_error = None
-    for candidate_port in range(port, port + 20):
+    for candidate_port in ports:
         try:
-            server = ThreadingHTTPServer(("127.0.0.1", candidate_port), Handler)
+            server = ThreadingHTTPServer((host, candidate_port), Handler)
             server.daemon_threads = True
             return server
         except OSError as exc:
             last_error = exc
-    raise RuntimeError(f"No free port between {port} and {port + 19}: {last_error}")
+    if find_free_port:
+        raise RuntimeError(f"No free port between {port} and {port+19}: {last_error}")
+    raise RuntimeError(f"Could not start ECHO on {host}:{port}: {last_error}")
 
 
-def launch(port: int = 8765, open_browser: bool = True) -> None:
-    """Run the control panel until interrupted with Ctrl+C"""
-    server = _make_server(port)
-    url = f"http://127.0.0.1:{server.server_address[1]}/"
-    print(
-        f"\n  ECHO is running at {url}\n"
-        "  Use headphones. Press Ctrl+C here to stop.\n")
-    if open_browser:
-        threading.Timer(0.6, webbrowser.open, args=(url,)).start()
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\n  ECHO stopped.")
-    finally:
-        server.server_close()
+def launch(port: int = 8765, open_browser: bool = True, host: str = "127.0.0.1",
+            find_free_port: bool = True) -> None:
+    """Run the control panel until interrupted w/ Ctrl+C"""
+    server = _make_server(port, host, find_free_port)
+    actual_port = server.server_address[1]
 
+    if host == "0.0.0.0":
+        print(f"\n  ECHO is listening on {host}:{actual_port}\n")
+    else:
+        url = f"http://127.0.0.1:{actual_port}/"
+        print(f"\n  ECHO is running at {url}\n"
+                "  Use headphones. Press Ctrl+C here to stop.\n")
+        if open_browser:
+            threading.Timer(0.6, webbrowser.open, args=(url,)).start()
+    try: server.serve_forever()
+    except KeyboardInterrupt: print("\n  ECHO stopped.")
+    finally:server.server_close()
 
 def serve_background(port: int = 8765) -> str:
-    """Start the control panel in a background thread and return its URL"""
+    """Start the control panel in a background thread and return its URL."""
     server = _make_server(port)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return f"http://127.0.0.1:{server.server_address[1]}/"
