@@ -1,5 +1,5 @@
 
-# ECHO — Spatial Audio Instrument
+# ECHO: Spatial Audio Instrument
 
 ECHO is an interactive spatial audio instrument for creating and exploring sound in a virtual 2D environment. It combines sound synthesis, spatial positioning, source movement, and acoustic effects to create immersive audio compositions.
 
