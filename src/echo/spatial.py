@@ -196,6 +196,7 @@ def propagate(
     fs: int,
     prop: Propagation,
     gain: float = 1.0,
+    doppler: float | np.ndarray | None = None,
 ) -> np.ndarray:
     """Render a moving mono source as binaural stereo audio
 
@@ -211,7 +212,11 @@ def propagate(
     r_c = np.maximum(r_c, 0.05)
     side = px/r_c
 
-    common_delay = (prop.doppler - 1.0)*(r_c - r_c[0])
+    dop = np.asarray(prop.doppler if doppler is None else doppler, dtype=np.float64)
+    if dop.ndim == 0:
+        common_delay = (dop - 1.0)*(r_c - r_c[0])
+    else:
+        common_delay = np.cumsum((dop - 1.0)*np.diff(r_c, prepend=r_c[0]))
     gain_n = gain*(R_REF/np.maximum(r_c, R_REF)) ** prop.rolloff
     out = np.zeros((n, 2))
 

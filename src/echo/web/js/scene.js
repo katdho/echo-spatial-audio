@@ -137,7 +137,7 @@ export function draw() {
     const p = ui.paths[s.id];
     const col = colorOf(i);
     const on = i === ui.sel;
-    if (p && s.motion !== "Static") {
+    if (p && (s.motion !== "Static" || s.path)) {
       ctx.strokeStyle = col;
       ctx.globalAlpha = on ? 0.9 : 0.38;
       ctx.lineWidth = on ? 2.5 : 1.5;
@@ -147,16 +147,18 @@ export function draw() {
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.globalAlpha = 1;
-      const [ax, ay] = toS(v, s.x, s.y);
-      ctx.strokeStyle = col;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(ax, ay, on ? 7 : 5, 0, Math.PI * 2);
-      ctx.moveTo(ax - 4, ay);
-      ctx.lineTo(ax + 4, ay);
-      ctx.moveTo(ax, ay - 4);
-      ctx.lineTo(ax, ay + 4);
-      ctx.stroke();
+      if (!s.path) {   // the centre marker means nothing for a keyframed path
+        const [ax, ay] = toS(v, s.x, s.y);
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(ax, ay, on ? 7 : 5, 0, Math.PI * 2);
+        ctx.moveTo(ax - 4, ay);
+        ctx.lineTo(ax + 4, ay);
+        ctx.moveTo(ax, ay - 4);
+        ctx.lineTo(ax, ay + 4);
+        ctx.stroke();
+      }
     }
     const [px, py] = toS(v, ...posAt(s, t));
     const live = !ui.rendered || t >= s.start;
@@ -212,7 +214,7 @@ function hit(sx, sy) {
   const t = playT();
   for (let i = S.sources.length - 1; i >= 0; i--) {
     const s = S.sources[i];
-    for (const [x, y] of [[s.x, s.y], posAt(s, t)]) {
+    for (const [x, y] of s.path ? [posAt(s, t)] : [[s.x, s.y], posAt(s, t)]) {
       const [px, py] = toS(v, x, y);
       if (Math.hypot(px - sx, py - sy) <= 15) return i;
     }
@@ -225,6 +227,11 @@ map.addEventListener("pointerdown", e => {
   const i = hit(sx, sy);
   if (i < 0) return;
   if (i !== ui.sel) { ui.sel = i; renderLeft(); }
+  if (S.sources[i].path) {   // keyframed: the path, not x/y, decides where it is
+    showHint("This sound follows keyframes, so it can't be dragged. Choose a Movement Pattern to replace them.");
+    setTimeout(() => showHint(), 3500);
+    return;
+  }
   const v = computeView(map.clientWidth, map.clientHeight);
   const s = S.sources[i];
   const [wx, wy] = toW(v, sx, sy);

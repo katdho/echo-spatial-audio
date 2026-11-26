@@ -3,11 +3,12 @@
     python demo.py --files a.wav b.wav   # also use your own recordings as sources
     python demo.py --play                # play each render after writing it
 
-Writes four stereo WAV files (44.1 kHz) to ./renders/:
+Writes five stereo WAV files (44.1 kHz) to ./renders/:
   1_doppler_flyby      dry ticks fly past: time difference, Doppler, loudness
   2_orbiting_strings   plucked arpeggio orbits in a room w/ reverb and ping-pong echo
   3_distant_cathedral  bells spiral in a huge, dark, reverberant space
   4_composition_sketch layered scene that previews the final composition
+  5_automation         keyframes drive gain, reverb send, position, Doppler and echo feedback
 These are the same scenes as the demo cards in the control panel. Best on headphones
 """
 
@@ -17,10 +18,11 @@ from pathlib import Path
 
 import pyquist as pq
 
-from echo import DelaySettings, Echo, Flyby, Orbit, Oscillate, Propagation, ReverbSettings, Room, Spiral, Static, Waypoints
+from echo import (Curve, DelaySettings, Echo, Flyby, Orbit, Oscillate, PolarPath, Propagation,
+                  ReverbSettings, Room, Spiral, Static, Waypoints)
 from echo import (sources)
 
-OUT = Path("renders")
+OUT = Path(__file__).parent / "renders"
 
 
 def finish(name, audio, play):
@@ -102,13 +104,49 @@ def sketch(play, files):
     finish("4_composition_sketch", e.render(26.0), play)
 
 
+def demo5_automation(play):
+    """Demo 5- Automation: a string approaches, circles the listener, then recedes into the reverb.
+    Every change below is a keyframe curve, not a fixed setting"""
+    e = Echo()
+    e.room = Room(width=18, depth=14, absorption=0.25)
+    e.reverb = ReverbSettings(kind="fdn", t60=4.0, damping=0.3, level_db=-6.0)
+    e.delay = DelaySettings(enabled=True, time=0.375, feedback=0.25, level_db=-10.0)
+    # Scene level: the echo's repeats stay short, then open up for the final bars
+    e.automation = {"delay_feedback": Curve([(0, 0.25), (14, 0.25), (22, 0.75)], "smoothstep")}
+
+    arp = sources.pluck_line(pentatonic_arp(24), t60=2.0, damping=0.4, pick_position=0.2)
+    e.add_source(
+        arp, "arp",
+        # Position: 14 m away on the left, in to 2.5 m ahead, one full lap, then out to 16 m behind.
+        # Azimuth: 0 = ahead, 90 = right, 180 = behind, 270 = left (degrees, no wrap-around)
+        motion=PolarPath(
+            distance=Curve([(0, 14), (8, 2.5), (16, 2.5), (24, 16)], "smoothstep"),
+            azimuth=Curve([(0, 270), (8, 360), (16, 720), (24, 900)])),
+        automation={
+            # Louder as it arrives, a little quieter as it leaves
+            "gain_db": Curve([(0, -24), (8, 0), (16, 0), (24, -10)], "smoothstep"),
+            # Dry and close in the middle, washed out into the reverb at the end
+            "send": Curve([(0, 0.1), (12, 0.1), (24, 0.9)], "smoothstep")})
+
+    drone = sources.pluck_line([(0, "A1", 12), (12, "E2", 12)], t60=24.0, damping=0.5)
+    e.add_source(drone, "drone", motion=Static(0, 6.0), gain_db=-8, send=0.6)
+
+    # A flyby whose Doppler is off while it approaches and exaggerated (3x) once it has passed
+    e.add_source(sources.pluck_line([(0, "A3", 5)], t60=5.0), "fly",
+                 motion=Flyby(-25, 3, 25, 3, duration=6.0, start=16.0), start=16.0, loop=False,
+                 gain_db=-6, send=0.3,
+                 automation={"doppler": Curve([(16, 0.0), (19, 0.0), (19.5, 3.0)], "smoothstep")})
+    finish("5_automation", e.render(24.0), play)
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--files", nargs="*", default=[], help="optional audio files to use as sources")
     ap.add_argument("--play", action="store_true")
     args = ap.parse_args()
     for fn, a in [(demo1_doppler_flyby, ()), (demo2_orbiting_strings, ()),
-                  (demo3_distant_cathedral, (args.files,)), (sketch, (args.files,))]:
+                  (demo3_distant_cathedral, (args.files,)), (sketch, (args.files,)),
+                (demo5_automation, ())]:
         t0 = time.time()
         print(fn.__name__)
         fn(args.play, *a)

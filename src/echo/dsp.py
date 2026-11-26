@@ -182,26 +182,28 @@ def pluck(f0: float, duration: float, fs: int = 44100, t60: float | None = None,
 # Stereo ping-pong delay 
 # --------------------------------------------------------------------------- #
 
-def ping_pong(x: np.ndarray, M: int, g: float) -> np.ndarray:
+def ping_pong(x: np.ndarray, M: int, g: float | np.ndarray) -> np.ndarray:
     """Create stereo ping-pong echoes using cross-channel feedback.
 
     Each channel receives delayed feedback from the opposite channel,
     causing echoes to alternate between left and right while gradually
     decreasing in amplitude.
 
-        yL[n] = xL[n] + g*yR[n-M]
-        yR[n] = xR[n] + g*yL[n-M]
+        yL[n] = xL[n] + g[n]*yR[n-M]
+        yR[n] = xR[n] + g[n]*yL[n-M]
 
-    `x` is a stereo array w/ shape (N, 2).
+    `x` is a stereo array w/ shape (N, 2). `g` is a scalar or an array of N
+    per-sample feedback gains (automation). The block evaluation stays exact
+    for a time-varying g: g[n] only multiplies samples at least M back.
     """
     y = np.array(x, dtype=np.float64)
     N = len(y)
+    g = np.broadcast_to(np.asarray(g, dtype=np.float64), (N,))
     for s in range(M, N, M):
         e = min(s + M, N)
-        y[s:e, 0] += g*y[s-M:e-M, 1]
-        y[s:e, 1] += g*y[s-M:e-M, 0]
+        y[s:e, 0] += g[s:e]*y[s-M:e-M, 1]
+        y[s:e, 1] += g[s:e]*y[s-M:e-M, 0]
     return y
-
 
 # --------------------------------------------------------------------------- #
 # Reverbs

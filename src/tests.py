@@ -5,12 +5,14 @@ Each test either checks a fast block-based routine against the course notes'
 literal sample-by-sample recurrence, or checks a physical property such as
 Doppler, ITD, or T60. Also tests browser integration and DSP performance.
 
-Prints "ok" per test and "all 11 tests passed" at the end
+Prints "ok" per test and "all N tests passed" at the end
 """
 
 import time
 import numpy as np
-from echo import dsp
+from echo import (
+    Curve, DelaySettings, Echo, KeyframePath, PolarPath, ReverbSettings, Room, dsp, sources
+)
 from echo.spatial import (
     C_SOUND, HEAD, Flyby, Propagation, Static, propagate
 )
@@ -214,6 +216,267 @@ def test_speed():
     dt = time.time()-t0
     assert dt < 10, dt
     print(f"   20 s of FDN + delay read + one-pole: {dt:.2f} s")
+
+
+# --------------------------------------------------------------------------- #
+# Parameter automation
+# --------------------------------------------------------------------------- #
+
+def _raises(exc, fn):
+    """True if calling fn() raises exc"""
+    try:
+        fn()
+    except exc:
+        return True
+    return False
+
+
+def _dry_scene(audio, **kw):
+    """Scene with room, reverb and delay off, so only the source path is heard"""
+    e = Echo()
+    e.room.enabled = e.reverb.enabled = e.delay.enabled = False
+    e.add_source(audio, "src", **kw)
+    return e
+
+
+def test_curve_interpolation():
+    """Verify Curve holds its ends, interpolates linearly and with smoothstep, and handles jumps"""
+    c = Curve([(1, 0), (3, 10)])
+    assert np.allclose(c(np.array([0.0, 1.0, 2.0, 3.0, 5.0])), [0, 0, 5, 10, 10])
+    assert c(2.0) == 5.0                               # scalar in, scalar out
+
+    # smoothstep(u) = 3u^2 - 2u^3: 0.5 at u = 0.5, 3/16 - 2/64 = 0.15625 at u = 0.25
+    s = Curve([(1, 0), (3, 10)], "smoothstep")
+    assert np.isclose(s(2.0), 5.0) and np.isclose(s(1.5), 10*0.15625)
+    eps = 1e-3                                         # zero slope at the keyframes
+    assert s(1 + eps) < 0.01*c(1 + eps) and s(3 - eps) > 10 - 0.01*(10 - c(3 - eps))
+
+    # a keyframe's own shape applies to the segment that starts there
+    m = Curve([(0, 0, "smoothstep"), (2, 10), (4, 30)])
+    assert np.isclose(m(0.5), 10*0.15625) and np.isclose(m(3.0), 20.0)
+
+    # unsorted input is sorted; equal times make a jump to the later keyframe
+    j = Curve([(2, 5), (0, 0), (1, 1), (1, 4)])
+    assert np.allclose(j(np.array([0.5, 1.0, 1.5, 9.0])), [0.5, 4.0, 4.5, 5.0])
+    assert np.allclose(Curve([(0, 0), (1, 1), (1, 2)])(np.array([0.5, 1.0, 2.0])), [0.5, 2.0, 2.0])
+    assert np.allclose(Curve([(3, 7)])(np.array([0.0, 9.0])), 7.0)
+
+    # a lone step: first value before it, last value from that instant on
+    step = Curve([(2, 0), (2, 1)])
+    assert np.allclose(step(np.array([0.0, 1.999, 2.0, 3.0])), [0, 0, 1, 1])
+    lead = Curve([(0, 0), (0, 5), (4, 9)])
+    assert np.allclose(lead(np.array([-1.0, 0.0, 2.0, 4.0, 6.0])), [0, 5, 7, 9, 9])
+
+
+def test_automation_validation():
+    """Verify bad keyframes, unknown parameter names and non-finite curve output are rejected"""
+    assert _raises(ValueError, lambda: Curve([]))
+    assert _raises(ValueError, lambda: Curve([(0, 1)], "cubic"))
+    assert _raises(ValueError, lambda: Curve([(0, 1, "cubic")]))
+    assert _raises(ValueError, lambda: Curve([(0, float("nan"))]))
+    assert _raises(ValueError, lambda: Curve([(0, 1, "linear", 4)]))
+
+    tone = np.sin(2*np.pi*200*np.arange(f_s)/f_s)
+    assert _raises(ValueError, lambda: Echo().add_source(tone, automation={"gian_db": Curve([(0, 0)])}))
+    assert _raises(TypeError, lambda: Echo().add_source(tone, automation={"gain_db": 3.0}))
+
+    e = _dry_scene(tone, automation={"send": lambda t: np.full_like(t, np.nan)})
+    assert _raises(ValueError, lambda: e.render(1.0))
+    e = _dry_scene(tone)
+    e.automation = {"time": Curve([(0, 0.3)])}         # only delay_feedback is a scene parameter
+    assert _raises(ValueError, lambda: e.render(1.0))
+
+
+def test_gain_automation_follows_curve():
+    """Verify an automated gain_db shapes the rendered level as the curve says, within 0.25 dB"""
+    tone = np.sin(2*np.pi*200*np.arange(f_s)/f_s)      # whole cycles, so it loops seamlessly
+    prop = Propagation(air_absorption=0, head_shadow=0)
+    g = Curve([(1.0, -30.0), (7.0, 0.0)])              # linear in dB
+    a = _dry_scene(tone, motion=Static(0, 1), prop=prop, automation={"gain_db": g}
+                   ).render(8.0, normalize=False).samples[:, 0]
+    r = _dry_scene(tone, motion=Static(0, 1), prop=prop).render(8.0, normalize=False).samples[:, 0]
+
+    w = f_s//10                                        # 0.1 s = 20 cycles
+    for k in range(5, 75):
+        seg = slice(k*w, (k + 1)*w)
+        measured = 20*np.log10(np.sqrt(np.mean(a[seg]**2))/np.sqrt(np.mean(r[seg]**2)))
+        assert abs(measured - float(g((k + 0.5)*0.1))) < 0.25, (k, measured)
+
+
+def test_send_automation():
+    """Verify automated reverb send matches a fixed send when constant and is causal when stepped"""
+    def scene(send, auto=None):
+        e = Echo()
+        e.room.enabled = False
+        e.reverb = ReverbSettings(t60=1.0)
+        e.delay.enabled = False
+        e.add_source(sources.noise_bursts([0.5*i for i in range(12)], length=0.05), "ticks",
+                     motion=Static(0, 2), send=send, automation=auto or {})
+        return e.render(5.0, normalize=False).samples
+
+    fixed = scene(0.4)
+    assert np.allclose(fixed, scene(0.0, {"send": Curve([(0, 0.4)])}), atol=1e-9)
+
+    # send jumps from 0 to 1 at 2 s: the reverb hasn't been fed before that, so
+    # nothing before 2 s can differ from the send = 0 render
+    off = scene(0.0)
+    step = scene(0.0, {"send": Curve([(2.0, 0.0), (2.0, 1.0)])})
+    pre = int(2.0*f_s)
+    assert np.abs(step[:pre] - off[:pre]).max() < 1e-9
+    assert np.abs(step[pre:] - off[pre:]).max() > 1e-3
+
+
+def test_keyframe_paths():
+    """Verify KeyframePath and PolarPath hit their keyframes, ease correctly and hold the ends"""
+    p = KeyframePath.from_points([(0, -4, 2), (2, 4, 2), (4, 4, 8)])
+    x, y = p(np.array([0.0, 1.0, 2.0, 3.0, 9.0]))
+    assert np.allclose(x, [-4, 0, 4, 4, 4]) and np.allclose(y, [2, 2, 2, 5, 8])
+
+    s = KeyframePath.from_points([(0, 0, 0), (1, 1, 0)], "smoothstep")
+    assert np.isclose(s(np.array([0.25]))[0][0], 0.15625)
+
+    # 3 m away, from straight ahead (azimuth 0) to the listener's right (90)
+    q = PolarPath(distance=3.0, azimuth=Curve([(0, 0), (2, 90)]))
+    qx, qy = q(np.array([0.0, 1.0, 2.0]))
+    assert np.allclose(qx, [0, 3*np.sin(np.pi/4), 3]) and np.allclose(qy, [3, 3*np.cos(np.pi/4), 0])
+
+    # no wrap-around: 720 degrees over 4 s is 180 deg/s, two full turns that end where they began.
+    # t = 0.5 -> 90 deg (right), 1 -> 180 (behind), 2 -> 360 (ahead again), 4 -> 720
+    two = PolarPath(distance=2.0, azimuth=Curve([(0, 0), (4, 720)]))
+    tx, ty = two(np.array([0.0, 0.5, 1.0, 2.0, 4.0]))
+    assert np.allclose(tx, [0, 2, 0, 0, 0], atol=1e-9) and np.allclose(ty, [2, 0, -2, 2, 2], atol=1e-9)
+
+
+def test_polar_sweep_pans_left_to_right():
+    """Verify a source swept from azimuth 270 to 450 (left, ahead, right) moves its level from the left ear to the right"""
+    noise = 0.3*np.random.default_rng(5).standard_normal(f_s)
+    e = _dry_scene(noise, motion=PolarPath(3.0, Curve([(0, 270), (4, 450)])))
+    y = e.render(4.0, normalize=False).samples
+    rms = lambda v: np.sqrt(np.mean(v**2))
+    early, late = slice(0, f_s//2), slice(int(3.5*f_s), int(3.98*f_s))
+    assert rms(y[early, 0]) > 1.3*rms(y[early, 1])
+    assert rms(y[late, 1]) > 1.3*rms(y[late, 0])
+
+
+def test_doppler_automation():
+    """Verify per-sample Doppler equals the scalar case, bends pitch only while on, and never clicks"""
+    N = 4*f_s
+    t = np.arange(N)/f_s
+    x = np.sin(2*np.pi*1000*t)
+    px, py = Flyby(-30, 2, 30, 2, duration=4.0)(t)
+
+    # a constant array reproduces the scalar formula (D-1)*(r - r0)
+    y1 = propagate(x, px, py, f_s, Propagation(doppler=1.7))
+    y2 = propagate(x, px, py, f_s, Propagation(), doppler=np.full(N, 1.7))
+    assert np.abs(y1 - y2).max() < 1e-6
+
+    # off while approaching, physical afterwards: pitch is flat early, falls late
+    d = Curve([(1.2, 0.0), (1.3, 1.0)])
+    y = propagate(x, px, py, f_s, Propagation(), doppler=d(t))[:, 0]
+    assert abs(dominant_freq(y[int(0.3*f_s):int(1.0*f_s)]) - 1000) < 15
+    assert dominant_freq(y[int(3.0*f_s):int(3.7*f_s)]) < 1000*0.97
+
+    # a hard step 0 -> 3 mid-flight must not jump the delay (that would be a click):
+    # no sample-to-sample change larger than a smoothly pitch-shifted 1 kHz sine allows
+    step = np.where(t < 2.0, 0.0, 3.0)
+    flat = Propagation(rolloff=0, air_absorption=0, head_shadow=0)
+    q = propagate(x, px, py, f_s, flat, doppler=step)[:, 0]
+    assert np.abs(np.diff(q)).max() < 0.2
+
+
+def test_ping_pong_time_varying_feedback():
+    """Verify ping_pong accepts per-sample feedback gains and stays exact"""
+    M = 4410
+    x = np.zeros((f_s, 2))
+    x[0, 0] = 1.0
+    assert np.allclose(dsp.ping_pong(x, M, np.full(f_s, 0.8)), dsp.ping_pong(x, M, 0.8))
+
+    g = np.full(f_s, 0.8)
+    g[M] = 0.5                                        # the knob when echo 1 is formed
+    y = dsp.ping_pong(x, M, g)
+    assert np.isclose(y[M, 1], 0.5) and np.isclose(y[2*M, 0], 0.5*0.8)
+
+
+def test_delay_feedback_automation_and_tail():
+    """Verify delay feedback automation cuts the echoes when it reaches zero and sizes the tail"""
+    def scene(curve=None):
+        e = Echo()
+        e.room.enabled = e.reverb.enabled = False
+        e.delay = DelaySettings(enabled=True, time=0.25, feedback=0.8, level_db=0.0)
+        if curve is not None:
+            e.automation = {"delay_feedback": curve}
+        e.add_source(sources.noise_bursts([0.1], length=0.02), "click",
+                     motion=Static(0, 2), loop=False)
+        return e
+
+    # Echoes form every 0.25 s from t = 0.1. Feedback 0.8 until 0.7 s, then 0:
+    # echoes at 0.35 and 0.6 are made; the one that would form at 0.85 is not.
+    e = scene(Curve([(0.0, 0.8), (0.7, 0.8), (0.7, 0.0)]))
+    y = e.render(2.0, normalize=False).samples
+    energy = lambda a, b: float((y[int(a*f_s):int(b*f_s)]**2).sum())
+    assert energy(0.6, 0.65) > 1e-3 and energy(0.85, 1.0) < 1e-9
+
+    # a constant curve equals the fixed setting
+    a = scene().render(2.0, normalize=False).samples
+    b = scene(Curve([(0, 0.8)])).render(2.0, normalize=False).samples
+    assert a.shape == b.shape and np.allclose(a, b, atol=1e-9)
+
+    # the tail follows the feedback that applies once the sources stop
+    assert scene(Curve([(0, 0.8), (1, 0.0)]))._tail_seconds(2.0) == 0.0
+    assert scene(Curve([(0, 0.0), (1, 0.9)]))._tail_seconds(2.0) > 5.0
+
+
+def test_constant_curves_equal_fixed_values():
+    """Verify automating gain, send and Doppler with constant curves renders the same as fixed values"""
+    def scene(auto):
+        e = Echo()
+        e.room = Room(width=14, depth=11)
+        e.reverb = ReverbSettings(t60=0.8)
+        e.delay = DelaySettings(enabled=True, time=0.2, feedback=0.5)
+        notes = sources.pluck_line([(0, "A3", 1.0), (0.5, "E4", 1.0)])
+        kw = dict(gain_db=-4.0, send=0.4, prop=Propagation(doppler=1.7))
+        if auto:
+            e.automation = {"delay_feedback": Curve([(0, 0.5)])}
+            kw["automation"] = {"gain_db": Curve([(0, -4.0)]), "send": Curve([(0, 0.4)]),
+                                "doppler": Curve([(0, 1.7)])}
+        e.add_source(notes, "s", motion=Flyby(-8, 2, 8, 2, duration=2.5), **kw)
+        return e.render(3.0, normalize=False).samples
+
+    fixed, auto = scene(False), scene(True)
+    assert fixed.shape == auto.shape and np.abs(fixed - auto).max() < 1e-5
+
+
+def test_web_automation_json():
+    """Verify the panel's automation JSON builds curves and keyframed paths, and junk entries are ignored"""
+    from echo import webui
+
+    st = {
+        "length": 4,
+        "room": {"enabled": False}, "reverb": {"enabled": False}, "delay": {"enabled": True},
+        "automation": {"delay_feedback": [[0, 0.2], [2, 5.0]]},             # 5.0 clamps to 0.95
+        "sources": [{
+            "kind": "ticks", "id": "a", "motion": "Static", "x": 0, "y": 3,
+            "path": [[0, -3, 2], [2, 3, 2, "smoothstep"], ["bad"], [1, "nan", 0]],
+            "automation": {"gain": [[0, -20], [2, 0]], "send": "oops", "doppler": [[0, 2]]},
+        }],
+    }
+    e, length = webui.build_echo(st)
+    src = e.sources[0]
+    assert set(src.automation) == {"gain_db", "doppler"}                    # "send" was junk
+    assert np.isclose(src.automation["gain_db"](1.0), -10.0)
+    assert np.isclose(e.automation["delay_feedback"](2.0), 0.95)
+
+    # the two good path rows survive; the junk ones are dropped
+    xs = webui.scene_paths(st)["paths"]["a"]["x"]
+    assert len(xs) >= 300 and abs(xs[0] + 3) < 1e-6 and abs(xs[-1] - 3) < 1e-6
+    out = e.render(length)
+    assert out.samples.shape[1] == 2 and out.peak_amplitude > 0.1
+
+    # nothing usable -> falls back to the normal controls without raising
+    m = webui.build_motion({"motion": "Static", "x": 1, "y": 2, "path": "oops"})
+    assert (m.x, m.y) == (1, 2)
+    assert webui.build_source_automation({"automation": {"gain": [[0, "x"]], "send": None}}) == {}
+    assert webui.build_scene_automation({"automation": 7}) == {}
 
 
 if __name__ == "__main__":

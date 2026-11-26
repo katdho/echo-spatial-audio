@@ -16,6 +16,11 @@ Rendering signal flow:
         Dry mix + delay + reverb -----+--> Stereo output
 
 The engine automatically adds a tail to allow reverb and echoes to decay
+
+Automation (see automation.py): a source's `automation` dict can replace its
+gain_db, send and doppler with keyframe curves, and `Echo.automation` can replace
+the ping-pong delay_feedback. Curves are evaluated once per sample on scene time.
+A source's position is automated by giving it a KeyframePath or PolarPath motion.
 """
 
 from __future__ import annotations
@@ -24,7 +29,7 @@ from pathlib import Path
 from typing import Callable, Optional, Union
 import numpy as np
 import pyquist as pq
-from . import dsp
+from . import automation, dsp
 from .spatial import Propagation, Room, Static, propagate
 
 @dataclass
@@ -57,6 +62,11 @@ class Source:
     start: float = 0.0            # Playback start time, in seconds
     loop: bool = True
     prop: Propagation = field(default_factory=Propagation)
+    # Curves that replace gain_db / send / doppler: {"gain_db": Curve, ...}
+    automation: dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        automation.check_names(self.automation, automation.SOURCE_PARAMS, f"source {self.name!r}")
 
     @property
     def duration(self) -> float:
@@ -72,6 +82,8 @@ class Echo:
         self.reverb = ReverbSettings()
         self.delay = DelaySettings()
         self.master_peak_dbfs = -1.0
+        # Scene-level curves: {"delay_feedback": Curve}
+        self.automation: dict = {}
 
     def add_source(
         self,
@@ -109,16 +121,27 @@ class Echo:
         self.sources.append(src)
         return src
 
-    def _tail_seconds(self) -> float:
-        """Estimate how long effects need to decay after source playback"""
+    def _tail_seconds(self, seconds: Optional[float] = None) -> float:
+        """Estimate how long effects need to decay after source playback
+
+        `seconds` is the main playback length; it lets the estimate follow an
+        automated delay feedback (the largest value over the next 12 s)
+        """
         tail = 0.0
 
         if self.reverb.enabled:
             tail = max(tail, self.reverb.t60 + self.reverb.predelay)
 
-        if self.delay.enabled and self.delay.feedback > 0.01:
-            n_echoes = np.log(1e-3)/np.log(self.delay.feedback)
-            tail = max(tail, min(12.0, n_echoes*self.delay.time))
+        if self.delay.enabled:
+            fb = float(self.delay.feedback)
+            fn = self.automation.get("delay_feedback")
+            if fn is not None and seconds is not None:
+                grid = np.linspace(seconds, seconds + 12.0, 25)
+                fb = float(np.max(np.clip(fn(grid), *automation.PARAMS["delay_feedback"])))
+            fb = min(fb, 0.95)
+            if fb > 0.01:
+                n_echoes = np.log(1e-3)/np.log(fb)
+                tail = max(tail, min(12.0, n_echoes*self.delay.time))
 
         return min(tail, 14.0)
 
@@ -142,7 +165,8 @@ class Echo:
         master peak level
         """
         fs = self.fs
-        tail = self._tail_seconds() if tail is None else tail
+        automation.check_names(self.automation, automation.SCENE_PARAMS, "Echo.automation")
+        tail = self._tail_seconds(seconds) if tail is None else tail
         n_dur = int(seconds*fs)
         N = n_dur + int(tail*fs)
         t = np.arange(N)/fs
@@ -167,27 +191,32 @@ class Echo:
                 seg[-fade:] *= np.linspace(1.0, 0.0, fade)
                 x[start:start + n_play] = seg
 
-            x *= 10.0**(s.gain_db/20.0)
+            # Each of these is the source's fixed value, or one value per sample
+            # if the parameter is automated.
+            gain_db = automation.resolve(s.automation, "gain_db", s.gain_db, t)
+            dop = automation.resolve(s.automation, "doppler", s.prop.doppler, t)
+            send = automation.resolve(s.automation, "send", s.send, t)
+
+            x *= 10.0**(gain_db/20.0)
             px, py = s.motion(t)
-            dry += propagate(x, px, py, fs, s.prop)
+            dry += propagate(x, px, py, fs, s.prop, doppler=dop)
 
             if self.room.enabled:
                 refl = np.sqrt(max(1.0-self.room.absorption, 0.0))
                 for ix, iy in self.room.images(px, py):
-                    dry += propagate(x, ix, iy, fs, s.prop, gain=refl)
-            send_bus += s.send*x
+                    dry += propagate(x, ix, iy, fs, s.prop, gain=refl, doppler=dop)
+            send_bus += send*x
             
         out = dry.copy()
 
         if self.delay.enabled:
             M = max(1, int(round(self.delay.time*fs)))
-            echoes = (
-                dsp.ping_pong(
-                    dry,
-                    M,
-                    float(np.clip(self.delay.feedback, 0, 0.95))
-                )-dry
-            )
+            fb = automation.resolve(
+                self.automation,
+                "delay_feedback",
+                float(np.clip(self.delay.feedback, 0, 0.95)),
+                t)
+            echoes = dsp.ping_pong(dry, M, fb)-dry
             out += echoes*10.0**(self.delay.level_db/20.0)
 
         if self.reverb.enabled:

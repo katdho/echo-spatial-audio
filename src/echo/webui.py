@@ -34,12 +34,14 @@ from urllib.parse import parse_qs, urlparse
 import numpy as np
 import pyquist as pq
 from . import sources
+from .automation import INTERPOLATIONS, PolarPath, Curve, KeyframePath
 from .engine import DelaySettings, Echo, ReverbSettings
 from .spatial import Flyby, Orbit, Oscillate, Propagation, Room, Spiral, Static
 
 WEB_DIR = Path(__file__).parent / "web"
 MAX_UPLOAD = 100*1024*1024
 MAX_SOURCES = 12
+MAX_KEYFRAMES = 256
 
 # Explicit content types for the web files. Python's mimetypes module reads the
 # operating system's registry, which can report the wrong type for .css or .js
@@ -54,6 +56,17 @@ CONTENT_TYPES = {
     ".png":  "image/png",
     ".ico":  "image/x-icon",
 }
+
+def _approach_circle_recede(length=24.0, step=0.25):
+    """Keyframes (t, x, y) for the 'Automation' demo: in from the left, one lap, out behind.
+    Sampled from the same PolarPath as demo.py's demo 5, so the panel and the script agree"""
+    path = PolarPath(
+        distance=Curve([(0, 14), (8, 2.5), (16, 2.5), (24, 16)], "smoothstep"),
+        azimuth=Curve([(0, 270), (8, 360), (16, 720), (24, 900)]))
+    t = np.arange(0.0, length + step/2, step)
+    x, y = path(t)
+    return [[float(a), round(float(b), 3), round(float(c), 3)] for a, b, c in zip(t, x, y)]
+
 
 ARP = ["A3", "C4", "D4", "E4", "G4", "A4", "E4", "D4"]
 KINDS = [
@@ -159,6 +172,22 @@ PRESETS = [
                 x=0, y=2, radius=5, speed=0.2, start=18, gain=-8, send=0.2),
             dict(kind="note", name="Fly-by pluck", motion="Flyby",
                 x=0, y=3, radius=25, pass_time=5, start=22, send=0.3)]),
+    dict(id="automation",
+        label="Automation: approach and recede",
+        length=24,
+        blurb="One string arrives, circles you once, then drifts away into the reverb. Its volume, reverb and position all follow keyframes.",
+        room=dict(enabled=True, width=18, depth=14, absorption=0.25),
+        reverb=dict(enabled=True, t60=4.0, damping=0.3, level_db=-6),
+        delay=dict(enabled=True, time=0.375, feedback=0.25, level_db=-10),
+        sources=[
+            dict(kind="arpeggio", name="Keyframed arpeggio", motion="Static",
+                x=0, y=0, gain=0, send=0.1,
+                path=_approach_circle_recede(),
+                automation=dict(
+                    gain=[[0, -24, "smoothstep"], [8, 0, "smoothstep"], [16, 0, "smoothstep"], [24, -10]],
+                    send=[[0, 0.1, "smoothstep"], [12, 0.1, "smoothstep"], [24, 0.9]])),
+            dict(kind="drone", name="Drone", motion="Static",
+                x=0, y=6, gain=-8, send=0.6)]),
 ]
 
 _audio_cache: dict = {}
@@ -230,8 +259,62 @@ def _num(settings, key, default, lo=None, hi=None):
     return value
 
 
+def _points(raw, limits):
+    """Clean JSON keyframes [[time, v1, ..., (shape)], ...] from the browser
+
+    `limits` has one (low, high) pair per value after the time. Rows that aren't
+    lists of finite numbers are dropped (like _num, bad input never raises)
+    """
+    out = []
+    if not isinstance(raw, list):
+        return out
+    k = 1 + len(limits)
+    for row in raw[:MAX_KEYFRAMES]:
+        if not isinstance(row, (list, tuple)) or len(row) < k:
+            continue
+        try:
+            nums = [float(v) for v in row[:k]]
+        except (TypeError, ValueError):
+            continue
+        if not all(math.isfinite(v) for v in nums):
+            continue
+        shape = row[k] if len(row) > k and row[k] in INTERPOLATIONS else None
+        values = [min(max(v, lo), hi) for v, (lo, hi) in zip(nums[1:], limits)]
+        out.append((min(max(nums[0], 0.0), 600.0), *values, shape))
+    return out
+
+
+# panel field -> (library parameter, low, high); limits match the _num calls in build_echo
+_SOURCE_CURVES = {"gain": ("gain_db", -40, 12), "send": ("send", 0, 1), "doppler": ("doppler", 0, 4)}
+
+
+def build_source_automation(settings: dict) -> dict:
+    """Source `automation` from the browser: {"gain": [[t, dB(, shape)], ...], "send": ..., "doppler": ...}"""
+    raw = settings.get("automation")
+    curves = {}
+    if isinstance(raw, dict):
+        for key, (name, lo, hi) in _SOURCE_CURVES.items():
+            pts = _points(raw.get(key), [(lo, hi)])
+            if pts:
+                curves[name] = Curve(pts)
+    return curves
+
+
+def build_scene_automation(state: dict) -> dict:
+    """Scene `automation` from the browser: {"delay_feedback": [[t, 0..0.95(, shape)], ...]}"""
+    raw = state.get("automation")
+    pts = _points(raw.get("delay_feedback"), [(0, 0.95)]) if isinstance(raw, dict) else []
+    return {"delay_feedback": Curve(pts)} if pts else {}
+
+
 def build_motion(settings: dict):
-    """Create a source trajectory from its browser settings"""
+    """Create a source trajectory from its browser settings
+
+    A `path` of [[t, x, y(, shape)], ...] keyframes overrides the movement pattern
+    """
+    path = _points(settings.get("path"), [(-60, 60), (-60, 60)])
+    if path:
+        return KeyframePath.from_points(path)
     x = _num(settings, "x", 0, -60, 60)
     y = _num(settings, "y", 0, -60, 60)
     radius = _num(settings, "radius", 4, 0.1, 100)
@@ -289,6 +372,8 @@ def build_echo(state: dict) -> tuple[Echo, float]:
         feedback=_num(delay, "feedback", 0.45, 0, 0.95),
         level_db=_num(delay, "level_db", -8, -40, 12))
 
+    engine.automation = build_scene_automation(state)
+
     for settings in state.get("sources", [])[:MAX_SOURCES]:
         kind = settings.get("kind", "")
         audio, _ = make_audio(kind, str(settings.get("arg", "")))
@@ -300,6 +385,7 @@ def build_echo(state: dict) -> tuple[Echo, float]:
             send=_num(settings, "send", 0.3, 0, 1),
             start=_num(settings, "start", 0, 0, 90),
             loop=KIND_BY_ID.get(kind, {}).get("loop", True),
+            automation=build_source_automation(settings),
             prop=Propagation(
                 doppler=_num(settings, "doppler", 1, 0, 4),
                 rolloff=_num(settings, "rolloff", 1, 0, 3),

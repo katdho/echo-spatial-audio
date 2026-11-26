@@ -114,7 +114,7 @@ export function renderLeft() {
         "aria-pressed": i === ui.sel }, 
       h("i"), 
       h("b", { text: s.name }), 
-      h("small", { text: motionLabel(s.motion) })),
+      h("small", { text: s.path ? "Keyframes" : motionLabel(s.motion) })),
       h("button", { class: 
         "src-rm", 
         "aria-label": `Remove ${s.name}`, title: "Remove this sound", text: "✕", onclick: () => removeSource(i) })));
@@ -129,6 +129,12 @@ export function renderLeft() {
   const s = S.sources[ui.sel];
   if (!s) return;
   const mk = o => slider({ ...o, get: () => s[o.key], set: v => s[o.key] = v, def: () => s.def[o.key] });
+  // Controls whose value is replaced by keyframes in this scene are dimmed, like other no-effect controls.
+  const dim = (rows, why, overridden) => rows.forEach(r => {
+    const k = r.input && r.input.dataset.key;
+    if (k && overridden(k)) { r.classList.add("idle"); r.title = "No effect right now: " + why; }
+  });
+  const auto = k => !!(s.automation && s.automation[k]);
   const sp = s.motion === "Oscillate" ? "swings/min" : "laps/min";
   const radiusLabel = { 
     Orbit: "Orbit Radius", 
@@ -136,8 +142,8 @@ export function renderLeft() {
     Oscillate: "Sweep Range", 
     Flyby: "Pass Distance/Offset" }[s.motion];
 
-  const moveRows = [select("Movement Pattern", MOTIONS, () => s.motion, v => s.motion = v, 
-    "Choose how the sound moves around the listener")];
+  const moveRows = [select("Movement Pattern", MOTIONS, () => s.motion, v => { s.motion = v; delete s.path; }, 
+    "Choose how the sound moves around the listener. If this sound follows keyframes, picking a pattern replaces them")];
   moveRows.push(mk({ key: "x", label: "X-Position (Left/Right)", min: -15, max: 15, step: 0.1, fmt: metres, 
     hint: "Set the sound's horizontal position relative to the listener: Left(-); Right(+). For moving sounds, this sets the center of its movement path." }));
   moveRows.push(mk({ key: "y", label: "Y-Position (Back/Front)", min: -15, max: 15, step: 0.1, fmt: metres, 
@@ -155,22 +161,25 @@ export function renderLeft() {
     }));
   moveRows.push(mk({ key: "start", label: "Start Time", min: 0, max: S.length, step: 0.5, fmt: num(1, " s"), 
     hint: "When this sound starts, in seconds from the beginning." }));
+  dim(moveRows, "this sound follows keyframes. Choose a Movement Pattern to replace them.", k => s.path && k !== "start");
   rail.append(group("Movement", moveRows, () => PARAM_KEYS.slice(0, 7).forEach(k => s[k] = s.def[k])));
 
-  rail.append(group("Level", [
+  const levelRows = [
     mk({ key: "gain", label: "Volume", min: -30, max: 6, step: 0.5, fmt: db, 
         hint: "How loud this sound is before it travels around" }),
     mk({ key: "send", label: "Reverb amount", min: 0, max: 1, step: 0.01, fmt: pct, 
         hint: "How much goes into the reverb. More makes it sound farther away and washier.", 
         idle: () => S.reverb.enabled ? null : "the reverb is switched off (right side)." })
-  ], () => ["gain", "send"].forEach(k => s[k] = s.def[k])));
+  ];
+  dim(levelRows, "this is automated with keyframes in this scene.", auto);
+  rail.append(group("Level", levelRows, () => ["gain", "send"].forEach(k => s[k] = s.def[k])));
 
-  rail.append(group("Spatialization", [
+  const spatialRows = [
     mk({ key: "doppler", label: "Doppler Effect", min: 0, max: 3, step: 0.05, 
         fmt: v => v === 0 ? "off" : v.toFixed(2) + "x", 
         hint: "Controls how much the pitch changes as the sound moves toward or away from the listener. \
                0 disables the effect; 1 approximates the natural Doppler shift; higher values exaggerate it", 
-        idle: () => s.motion === "Static" ? "this sound isn't moving, so there is no pitch bend." : null }),
+        idle: () => s.motion === "Static" && !s.path ? "this sound isn't moving, so there is no pitch bend." : null }),
     mk({ key: "rolloff", label: "Distance Attenuation", min: 0, max: 2, step: 0.05, fmt: num(2), 
         hint: "Controls how quickly the sound gets quieter as it moves farther away. \
                0 keeps its volume constant regardless of distance" }),
@@ -178,7 +187,9 @@ export function renderLeft() {
         hint: "Controls how much high-frequency content is lost over distance. Higher values make distant sounds sound duller" }),
     mk({ key: "shadow", label: "Head Shadow", min: 0, max: 1, step: 0.01, fmt: pct, 
         hint: "How much your head muffles the ear facing away from the sound." })
-  ], () => ["doppler", "rolloff", "air", "shadow"].forEach(k => s[k] = s.def[k])));
+  ];
+  dim(spatialRows, "this is automated with keyframes in this scene.", auto);
+  rail.append(group("Spatialization", spatialRows, () => ["doppler", "rolloff", "air", "shadow"].forEach(k => s[k] = s.def[k])));
 }
 
 /* ------------------------------------------------------------------ room and effects (right panel) */

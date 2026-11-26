@@ -5,15 +5,17 @@ Package layout:
   spatial.py  sound paths, the room, and the binaural propagation model
   engine.py   the Echo class: sources + room + reverb + delay -> stereo render
   sources.py  built-in sounds (plucked strings, noise ticks)
+  automation.py  keyframe curves for gain, send, Doppler, delay feedback, and position
   webui.py    local web server for the browser control panel (no DSP)
 Import the public names from here:  from echo import Echo, Orbit, ReverbSettings
 """
 
-from echo import dsp, sources
+from echo import automation, dsp, sources
+from .automation import Curve, KeyframePath, PolarPath
 from .engine import DelaySettings, Echo, ReverbSettings, Source
 from .spatial import (MOTIONS, Flyby, Oscillate, Orbit, Propagation, Room, Spiral,
                       Static, Waypoints)
 
 __all__ = ["Echo", "Source", "ReverbSettings", "DelaySettings", "Room", "Propagation",
            "Static", "Orbit", "Spiral", "Oscillate", "Flyby", "Waypoints", "MOTIONS",
-           "dsp", "sources"]
+           "Curve", "KeyframePath", "PolarPath", "automation", "dsp", "sources"]
