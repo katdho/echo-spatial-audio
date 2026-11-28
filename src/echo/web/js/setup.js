@@ -67,8 +67,9 @@ export function renderSetupBar() {
 /* ------------------------------------------------------------------ demos */
 export function loadPreset(p) {
   resetAudio();
-  setState({ length: p.length, sources: [], room: { ...ROOM0, ...p.room }, reverb: { ...REVERB0, ...p.reverb }, delay: { ...DELAY0, ...p.delay } });
-  for (const d of p.sources) { const { kind, name, ...over } = d; S.sources.push(newSource(kind, over, "", name)); }
+  setState({ length: p.length, sources: [], room: { ...ROOM0, ...p.room }, reverb: { ...REVERB0, ...p.reverb }, delay: { ...DELAY0, ...p.delay },
+    automation: JSON.parse(JSON.stringify(p.automation || {})) });
+  for (const d of p.sources) { const { kind, name, ...over } = JSON.parse(JSON.stringify(d)); S.sources.push(newSource(kind, over, "", name)); }
   setG0(S);
   ui.built = true;
   ui.sel = 0;

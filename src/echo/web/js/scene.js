@@ -4,6 +4,7 @@ drawing, source paths, and drag-to-move interaction */
 import { $, S, ui, colorOf, payload } from "./state.js";
 import { markDirty, showHint, renderLeft } from "./controls.js";
 import { audio } from "./audio.js";
+import { drawLanes, drawKeyframes, scrubTime } from "./automation.js";
 
 /* ------------------------------------------------------------------ scene data */
 let sceneBusy = false;
@@ -28,6 +29,7 @@ const ctx = map.getContext("2d");
 let drawQueued = false;
 let frozenView = null;   // view held fixed while dragging so the map doesn't rescale under the cursor
 let drag = null;
+export function freezeView(v) { frozenView = v; }   // used by the keyframe editor while dragging
 
 const font = spec => spec + " " + getComputedStyle(document.body).fontFamily;
 
@@ -37,7 +39,7 @@ export function requestDraw() {
   requestAnimationFrame(() => { drawQueued = false; draw(); });
 }
 
-function computeView(w, h_) {
+export function computeView(w, h_) {
   let rx = 8, ry = 8;
   if (S.room.enabled) { rx = Math.max(rx, S.room.width / 2); ry = Math.max(ry, S.room.depth / 2); }
   for (const s of S.sources) {
@@ -51,10 +53,10 @@ function computeView(w, h_) {
   return { sc: Math.min((w / 2) / rx, (h_ / 2) / ry), cx: w / 2, cy: h_ / 2 };
 }
 
-const toS = (v, x, y) => [v.cx + x * v.sc, v.cy - y * v.sc];
-const toW = (v, sx, sy) => [(sx - v.cx) / v.sc, (v.cy - sy) / v.sc];
+export const toS = (v, x, y) => [v.cx + x * v.sc, v.cy - y * v.sc];
+export const toW = (v, sx, sy) => [(sx - v.cx) / v.sc, (v.cy - sy) / v.sc];
 
-function posAt(s, t) {
+export function posAt(s, t) {
   const p = ui.paths[s.id];
   if (!p) return [s.x, s.y];
   const n = p.x.length;
@@ -63,7 +65,8 @@ function posAt(s, t) {
   return [p.x[i] + (p.x[j] - p.x[i]) * u, p.y[i] + (p.y[j] - p.y[i]) * u];
 }
 
-const playT = () => ui.rendered ? audio.currentTime : 0;
+// While the Position editor has a time cursor and nothing is playing, sounds are shown at the cursor time
+const playT = () => { const e = scrubTime(); return e !== null && audio.paused ? e : (ui.rendered ? audio.currentTime : 0); };
 
 function resizeCanvas() {
   const dpr = window.devicePixelRatio || 1;
@@ -74,6 +77,7 @@ function resizeCanvas() {
 
 export function draw() {
   if (ui.view !== 1) return;
+  drawLanes();
   const { w, h: hh, dpr } = resizeCanvas();
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, hh);
@@ -160,6 +164,7 @@ export function draw() {
         ctx.stroke();
       }
     }
+    drawKeyframes(ctx, v, s, i);
     const [px, py] = toS(v, ...posAt(s, t));
     const live = !ui.rendered || t >= s.start;
     ctx.globalAlpha = live ? 1 : 0.4;
@@ -228,7 +233,7 @@ map.addEventListener("pointerdown", e => {
   if (i < 0) return;
   if (i !== ui.sel) { ui.sel = i; renderLeft(); }
   if (S.sources[i].path) {   // keyframed: the path, not x/y, decides where it is
-    showHint("This sound follows keyframes, so it can't be dragged. Choose a Movement Pattern to replace them.");
+    showHint("This sound follows keyframes. Open the Position tab under the map to edit them, or choose a Movement Pattern to replace them.");
     setTimeout(() => showHint(), 3500);
     return;
   }

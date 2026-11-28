@@ -155,3 +155,16 @@ dialog .cards{grid-template-columns:1fr 1fr}
   .tag{display:none}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ---------- automation lanes (js/automation.js) ---------- */
+.lanes{border-top:1px solid var(--line);background:var(--panel);padding:8px 20px 8px;display:flex;flex-direction:column;gap:6px;flex:none;--c:var(--gold)}
+.lane-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.lane-tabs{display:flex;gap:4px;flex-wrap:wrap}
+.lane-tab{background:none;border:1px solid var(--line);border-radius:999px;padding:3px 11px;color:var(--muted);font-size:13px;display:inline-flex;align-items:center}
+.lane-tab:hover{border-color:#43507a;color:var(--text)}
+.lane-tab.cur{background:var(--panel2);color:var(--text);border-color:var(--c)}
+.lane-tab .dot{background:var(--c);margin-right:6px}
+.lane-tools{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.lane-tools .btn{padding:3px 10px;font-size:12px}
+.lane-canvas{width:100%;height:132px;display:block;border-radius:8px;background:#0c101c;touch-action:none;cursor:crosshair}
+.lane-help{color:var(--muted);font-size:12px;min-height:17px}

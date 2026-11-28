@@ -90,6 +90,12 @@ Interface behavior is defined in js/ (entry point: js/app.js) -->
       <canvas id="map" aria-label="Top-down map of the room. Drag a sound to move it."></canvas>
     </div>
 
+    <section class="lanes" id="lanes" aria-label="Automation: change settings over time" hidden>
+      <div class="lane-bar" id="lane-bar"></div>
+      <canvas class="lane-canvas" id="lane-canvas" tabindex="0" aria-label="Automation graph. Click to add a point, drag to move it, double-click to delete it."></canvas>
+      <p class="lane-help" id="lane-help"></p>
+    </section>
+
     <p class="hint" id="hint"></p>
 
     <div class="transport">

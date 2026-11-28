@@ -57,7 +57,7 @@ CONTENT_TYPES = {
     ".ico":  "image/x-icon",
 }
 
-def _approach_circle_recede(length=24.0, step=0.25):
+def _approach_circle_recede(length=24.0, step=0.5):
     """Keyframes (t, x, y) for the 'Automation' demo: in from the left, one lap, out behind.
     Sampled from the same PolarPath as demo.py's demo 5, so the panel and the script agree"""
     path = PolarPath(
@@ -179,6 +179,8 @@ PRESETS = [
         room=dict(enabled=True, width=18, depth=14, absorption=0.25),
         reverb=dict(enabled=True, t60=4.0, damping=0.3, level_db=-6),
         delay=dict(enabled=True, time=0.375, feedback=0.25, level_db=-10),
+        # scene-level keyframes: the echo's repeats open up for the last bars
+        automation=dict(delay_feedback=[[0, 0.25], [14, 0.25, "smoothstep"], [22, 0.75]]),
         sources=[
             dict(kind="arpeggio", name="Keyframed arpeggio", motion="Static",
                 x=0, y=0, gain=0, send=0.1,

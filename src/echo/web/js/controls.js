@@ -4,6 +4,7 @@ and the scene-length slider */
 
 import { $, h, S, G0, ui, colorOf, MOTIONS, PARAM_KEYS, HINT_DEFAULT } from "./state.js";
 import { fetchScene, requestDraw } from "./scene.js";
+import { renderLanes } from "./automation.js";
 import { openAdd, removeSource } from "./setup.js";
 
 /* ------------------------------------------------------------------ status + buttons */
@@ -106,6 +107,7 @@ export function renderLeft() {
   const rail = $("#rail-left");
   rail.replaceChildren();
   rail.style.setProperty("--c", colorOf(ui.sel));
+  renderLanes();
   const list = h("ul", { class: "src-list" });
   S.sources.forEach((s, i) => {
     list.append(h("li", { class: "src-item" + (i === ui.sel ? " sel" : ""), style: `--c:${colorOf(i)}` },
@@ -234,7 +236,8 @@ export function renderRight() {
     mkG(D, g.delay, { key: "time", label: "Time between echoes", min: 0.05, max: 1.5, step: 0.005, 
         fmt: v => Math.round(v * 1000) + " ms", hint: "Gap between repeats. Each repeat bounces to the other ear." }),
     mkG(D, g.delay, { key: "feedback", label: "Repeats", min: 0, max: 0.95, step: 0.01, fmt: pct, 
-        hint: "How many times it repeats. Higher lasts longer." }),
+        hint: "How many times it repeats. Higher lasts longer.",
+        idle: () => S.automation && S.automation.delay_feedback ? "it is automated with keyframes under the map." : null }),
     mkG(D, g.delay, { key: "level_db", label: "Level", min: -30, max: 6, step: 0.5, fmt: db, 
         hint: "How loud the echoes are." })
   ], ["enabled", "time", "feedback", "level_db"], "Turns the echo on or off"));

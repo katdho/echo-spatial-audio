@@ -14,7 +14,7 @@ export const PARAM_KEYS = ["motion", "x", "y", "radius", "speed", "pass_time", "
 export const HINT_DEFAULT = "Drag a sound on the map to move it. Hover any control to see what it does. Double-click a control's name to reset it.";
 
 /* ------------------------------------------------------------------ state */
-export const freshState = () => ({ length: 16, sources: [], room: { ...ROOM0 }, reverb: { ...REVERB0 }, delay: { ...DELAY0 } });
+export const freshState = () => ({ length: 16, sources: [], room: { ...ROOM0 }, reverb: { ...REVERB0 }, delay: { ...DELAY0 }, automation: {} });
 export const snapshot = s => JSON.parse(JSON.stringify(s));
 
 export const S = freshState();   // everything the engine needs

@@ -179,6 +179,7 @@ def test_web_panel_backend():
             "room": p["room"],
             "reverb": {**p["reverb"], "t60": 0.5},
             "delay": p["delay"],
+            "automation": p.get("automation", {}),
             "sources": [dict(s, id=str(i)) for i, s in enumerate(p["sources"])]
         }
 
